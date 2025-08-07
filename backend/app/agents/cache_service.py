@@ -1,6 +1,7 @@
 import json
 import numpy as np
 from typing import Dict, Any, Optional, List
+from datetime import datetime
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from backend.app.db.base import get_redis
 from backend.app.core.config import settings
@@ -83,7 +84,7 @@ class SemanticCacheService:
                 "category": category,
                 "embedding": query_embedding,
                 "metadata": metadata or {},
-                "timestamp": int(np.datetime64('now').astype(np.int64) / 1e9)
+                "timestamp": int(datetime.now().timestamp())
             }
             
             # Store in Redis with expiration (7 days)

@@ -7,7 +7,7 @@ from .schemas import (
     TicketDetailResponse, ConversationResponse, TicketRatingRequest,
     TicketReopenResponse
 )
-from backend.app.agents.routing_agent import process_ticket
+from backend.app.agents.langgraph_workflow import process_ticket_sync
 
 router = APIRouter()
 
@@ -37,8 +37,8 @@ async def create_ticket(
         message=ticket_data.message
     )
     
-    # Process ticket through LangGraph workflow in background
-    background_tasks.add_task(process_ticket, ticket_id)
+    # Process ticket through enhanced LangGraph workflow in background
+    background_tasks.add_task(process_ticket_sync, ticket_id)
     
     return {
         "message": "Ticket submitted successfully",
@@ -182,8 +182,8 @@ async def reopen_ticket(
         message="Ticket reopened by student"
     )
     
-    # Process reopened ticket through routing agent
-    background_tasks.add_task(process_ticket, ticket_id)
+    # Process reopened ticket through enhanced LangGraph workflow
+    background_tasks.add_task(process_ticket_sync, ticket_id)
     
     return TicketReopenResponse(
         message="Ticket reopened successfully and sent for processing",
