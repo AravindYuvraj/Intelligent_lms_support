@@ -61,7 +61,7 @@ def main():
             host="0.0.0.0",
             port=8000,
             log_level="info",
-            reload=True
+            # reload=True
         )
         
     except Exception as e:
