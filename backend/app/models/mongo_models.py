@@ -95,6 +95,7 @@ class TicketService(MongoBaseService):
                      from_date: Optional[str] = None, to_date: Optional[str] = None,
                      attachments: Optional[List[str]] = None) -> str:
         """Create a new ticket"""
+        print('Received Create request',title, message)
         ticket_doc = {
             "user_id": user_id,
             "category": category,

@@ -81,12 +81,12 @@ export default function TicketDetailPage() {
     
     // Mock API call to update rating
     try {
-      await fetch(`/api/tickets/${params.id}/rate`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/rate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
+        credentials: 'include',
         body: JSON.stringify({ rating })
       })
     } catch (error) {
@@ -96,11 +96,9 @@ export default function TicketDetailPage() {
 
   const handleReopenTicket = async () => {
     try {
-      await fetch(`/api/tickets/${params.id}/reopen`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/reopen`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
+        credentials: 'include',
       })
       
       // Refresh the page or update state

@@ -72,13 +72,13 @@ export default function CreateTicketPage() {
     setIsSubmitting(true)
 
     try {
-      // Mock API call - replace with actual endpoint
-      const response = await fetch('/api/tickets/create', {
+      // Real API call - post to backend
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
+        credentials: 'include',
         body: JSON.stringify({
           category,
           title,
@@ -176,13 +176,49 @@ export default function CreateTicketPage() {
             <div className="border rounded-lg">
               {/* Rich Text Editor Toolbar */}
               <div className="flex items-center space-x-2 p-2 border-b bg-gray-50">
-                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => {
+                  // Bold: Markdown style
+                  const textarea = document.getElementById('message') as HTMLTextAreaElement;
+                  if (!textarea) return;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const before = message.slice(0, start);
+                  const selected = message.slice(start, end);
+                  const after = message.slice(end);
+                  const newText = before + '**' + selected + '**' + after;
+                  setMessage(newText);
+                  setTimeout(() => {textarea.focus(); textarea.setSelectionRange(start+2, end+2);}, 0);
+                }}>
                   <strong>B</strong>
                 </Button>
-                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => {
+                  // Italic: Markdown style
+                  const textarea = document.getElementById('message') as HTMLTextAreaElement;
+                  if (!textarea) return;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const before = message.slice(0, start);
+                  const selected = message.slice(start, end);
+                  const after = message.slice(end);
+                  const newText = before + '*' + selected + '*' + after;
+                  setMessage(newText);
+                  setTimeout(() => {textarea.focus(); textarea.setSelectionRange(start+1, end+1);}, 0);
+                }}>
                   <em>I</em>
                 </Button>
-                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => {
+                  // Underline: HTML tag
+                  const textarea = document.getElementById('message') as HTMLTextAreaElement;
+                  if (!textarea) return;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const before = message.slice(0, start);
+                  const selected = message.slice(start, end);
+                  const after = message.slice(end);
+                  const newText = before + '<u>' + selected + '</u>' + after;
+                  setMessage(newText);
+                  setTimeout(() => {textarea.focus(); textarea.setSelectionRange(start+3, end+3);}, 0);
+                }}>
                   <u>U</u>
                 </Button>
                 <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">

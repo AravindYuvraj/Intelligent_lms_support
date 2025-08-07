@@ -104,6 +104,7 @@ class EnhancedLangGraphWorkflow:
     
     def _build_workflow(self) -> StateGraph:
         """Build the LangGraph workflow with proper state transitions"""
+        print("Building LangGraph workflow...")
         workflow = StateGraph(GraphState)
         
         # Add nodes
@@ -163,6 +164,7 @@ class EnhancedLangGraphWorkflow:
         """Initialize the workflow state with ticket information"""
         try:
             ticket = ticket_service.get_ticket_by_id(state["ticket_id"])
+            print(f"Initializing state for ticket {state['ticket_id']}...", ticket)
             if not ticket:
                 raise ValueError(f"Ticket {state['ticket_id']} not found")
             
@@ -215,7 +217,7 @@ class EnhancedLangGraphWorkflow:
                 state["processed_query"], 
                 threshold=0.85
             )
-            
+            print(f"Cache check for ticket {state['ticket_id']}...", cached_result)
             if cached_result:
                 state["cached_response"] = cached_result["response"]
                 state["confidence_score"] = cached_result.get("confidence", 0.9)
@@ -584,6 +586,7 @@ workflow_instance = EnhancedLangGraphWorkflow()
 
 async def process_ticket_async(ticket_id: str):
     """Async wrapper for ticket processing"""
+    print(f"Processing ticket {ticket_id} through LangGraph workflow...")
     return await workflow_instance.process_ticket(ticket_id)
 
 def process_ticket_sync(ticket_id: str):

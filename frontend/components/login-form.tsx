@@ -21,23 +21,27 @@ export default function LoginForm() {
     setError('')
 
     try {
-      // Mock authentication - replace with actual API call
-      const response = await fetch('/api/auth/login', {
+      // Real authentication - call backend API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email, password }),
+        credentials: 'include'
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        localStorage.setItem('authToken', 'mock-token')
-        localStorage.setItem('userRole', data.role)
-        localStorage.setItem('userEmail', email)
-        router.push('/dashboard')
+      const data = await response.json();
+      if (response.ok && data.session_token) {
+        localStorage.setItem('authToken', data.session_token);
+        localStorage.setItem('userRole', data.role);
+        localStorage.setItem('userEmail', data.email);
+        setError('');
+        router.push('/dashboard');
       } else {
-        setError('Invalid email or password')
+        let msg = 'Invalid email or password';
+        if (data?.detail) msg = data.detail;
+        else if (data?.message) msg = data.message;
+        setError(msg);
       }
     } catch (err) {
       setError('Login failed. Please try again.')
@@ -58,7 +62,7 @@ export default function LoginForm() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -71,7 +75,7 @@ export default function LoginForm() {
               className="w-full"
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <Input
@@ -84,7 +88,7 @@ export default function LoginForm() {
               className="w-full"
             />
           </div>
-          
+
           <Button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700"
