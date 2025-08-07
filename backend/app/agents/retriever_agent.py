@@ -78,44 +78,48 @@ class RetrieverAgent:
     
     def _get_category_filter(self, category: str) -> Dict[str, Any]:
         """Get Pinecone filter based on ticket category - map to 3 knowledge base categories"""
-        # Map ticket categories to our 3 knowledge base categories:
-        # 1. Program Details - course info, schedules, structure
-        # 2. Q&A - FAQs, common questions, troubleshooting  
-        # 3. Curriculum Documents - technical content, assignments, evaluations
+        # Map ticket categories to our 3 EXACT knowledge base collection names:
+        # 1. qa_documents - FAQs, common questions, troubleshooting
+        # 2. program_details_documents - course info, schedules, policies, timelines
+        # 3. curriculum_documents - technical content, assignments, evaluations
         
         category_mapping = {
-            # Course and program related
-            "Course Query": "Program Details",
-            "Attendance/Counselling Support": "Program Details", 
-            "Revision": "Program Details",
-            "Late Evaluation Submission": "Program Details",
-            "Missed Evaluation Submission": "Program Details",
+            # Program and administrative related → program_details_documents
+            "Course Query": "program_details_documents",
+            "Attendance/Counselling Support": "program_details_documents", 
+            "Leave": "program_details_documents",  # Leave policies are program details
+            "Late Evaluation Submission": "program_details_documents",  # Submission policies
+            "Missed Evaluation Submission": "program_details_documents",  # Evaluation policies
+            "Withdrawal": "program_details_documents",  # Withdrawal policies
             
-            # Technical and curriculum related
-            "Evaluation Score": "Curriculum Documents",
-            "Code Review": "Curriculum Documents",
-            "MAC": "Curriculum Documents",
-            "Session Support - Placement": "Curriculum Documents",
+            # Technical and curriculum related → curriculum_documents
+            "Evaluation Score": "curriculum_documents",
+            "Code Review": "curriculum_documents",
+            "MAC": "curriculum_documents",  # Masai Additional Curriculum
+            "Revision": "curriculum_documents",  # Course content revision
+            "IA Support": "curriculum_documents",  # Technical support from IA
             
-            # Support, troubleshooting, FAQs
-            "Product Support": "Q&A",
-            "IA Support": "Q&A", 
-            "NBFC/ISA": "Q&A",
-            "Feedback": "Q&A",
-            "Withdrawal": "Q&A",
+            # General support, FAQs, troubleshooting → qa_documents
+            "Product Support": "qa_documents",
+            "NBFC/ISA": "qa_documents",  # Financial FAQs
+            "Feedback": "qa_documents",
+            "Referral": "qa_documents",
+            "Personal Query": "qa_documents",
             
-            # Placement related - could go to Q&A for general questions
-            "Placement Support - Placements": "Q&A",
-            "Offer Stage- Placements": "Q&A", 
-            "ISA/EMI/NBFC/Glide Related - Placements": "Q&A",
-            
-            # Admin/procedural
-            "Leave": "Q&A",
-            "Referral": "Q&A",
-            "Personal Query": "Q&A"
+            # Placement related → qa_documents (mostly FAQs about placement)
+            "Placement Support - Placements": "qa_documents",
+            "Offer Stage- Placements": "qa_documents", 
+            "ISA/EMI/NBFC/Glide Related - Placements": "qa_documents",
+            "Session Support - Placement": "qa_documents",
         }
         
-        mapped_category = category_mapping.get(category, "Q&A")  # Default to Q&A
+        # Get the mapped category, default to qa_documents for unknown categories
+        mapped_category = category_mapping.get(category, "qa_documents")
+        
+        # Log the mapping for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Ticket category '{category}' mapped to knowledge base: '{mapped_category}'")
         
         return {"category": {"$eq": mapped_category}}
     

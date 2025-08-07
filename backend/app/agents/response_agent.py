@@ -92,9 +92,15 @@ class ResponseAgent:
             """
             
             response = await self.llm.ainvoke(personalization_prompt)
-            result = json.loads(response.content)
             
-            return result["personalized_response"], result["confidence_score"]
+            try:
+                result = json.loads(response.content)
+                return result.get("personalized_response", cached_response), result.get("confidence_score", 0.8)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error in personalization: {str(e)}")
+                logger.debug(f"Raw response: {response.content}")
+                # Fallback to original cached response
+                return cached_response, 0.8
             
         except Exception as e:
             logger.error(f"Personalization error: {str(e)}")
@@ -138,9 +144,17 @@ class ResponseAgent:
             """
             
             response = await self.llm.ainvoke(response_prompt)
-            result = json.loads(response.content)
             
-            return result["response"], result["confidence_score"]
+            try:
+                result = json.loads(response.content)
+                return result.get("response", "I'm having trouble processing your request."), result.get("confidence_score", 0.1)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error in response generation: {str(e)}")
+                logger.debug(f"Raw response: {response.content}")
+                return (
+                    "I'm having trouble generating a response right now. Your query has been forwarded to our support team.", 
+                    0.1
+                )
             
         except Exception as e:
             logger.error(f"Response generation error: {str(e)}")
