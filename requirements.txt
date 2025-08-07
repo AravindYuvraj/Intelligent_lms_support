@@ -1,0 +1,33 @@
+# Core Backend
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+passlib[bcrypt]==1.7.4
+itsdangerous==2.1.2
+python-dotenv==1.0.0
+
+# Database
+pymongo==4.6.0
+redis==5.0.1
+
+# LangChain & LangGraph (Compatible versions)
+langchain==0.3.7
+langchain-community==0.3.7
+langchain-google-genai==2.0.4
+langgraph==0.2.34
+langsmith==0.1.137
+
+# Vector Database
+pinecone-client==5.0.1
+
+# File Processing
+pandas==2.1.4
+openpyxl==3.1.2
+python-docx==1.1.0
+pypdf==3.17.0
+
+# Utilities
+pydantic>=2.7.4
+httpx==0.25.2
+cloudinary==1.36.0
+celery==5.3.4

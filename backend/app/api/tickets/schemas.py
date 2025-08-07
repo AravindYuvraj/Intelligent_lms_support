@@ -1,0 +1,75 @@
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+
+class TicketCreateRequest(BaseModel):
+    category: str
+    title: str
+    message: str
+    subcategory_data: Optional[Dict[str, Any]] = None
+    from_date: Optional[str] = None
+    to_date: Optional[str] = None
+    attachments: Optional[List[str]] = None
+
+class TicketResponse(BaseModel):
+    id: int
+    user_id: int
+    category: str
+    status: str
+    title: str
+    message: str
+    subcategory_data: Optional[Dict[str, Any]]
+    from_date: Optional[str]
+    to_date: Optional[str]
+    attachments: Optional[List[str]]
+    assigned_to: Optional[int]
+    rating: Optional[float]
+    created_at: datetime
+    updated_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class TicketListResponse(BaseModel):
+    id: int
+    user_id: int
+    category: str
+    status: str
+    title: str
+    created_at: datetime
+    updated_at: Optional[datetime]
+    rating: Optional[float]
+    assigned_to: Optional[int]
+    assigned_admin_email: Optional[str] = None  # Will be populated from join
+    response_count: int = 0  # Count of conversations
+    last_response: Optional[str] = None  # Last conversation message
+    last_response_time: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class ConversationResponse(BaseModel):
+    id: int
+    ticket_id: int
+    sender_role: str
+    sender_id: Optional[int]
+    message: str
+    confidence_score: Optional[float]
+    timestamp: datetime
+    sender_email: Optional[str] = None  # For display purposes
+    
+    class Config:
+        from_attributes = True
+
+class TicketDetailResponse(BaseModel):
+    ticket: TicketResponse
+    conversations: List[ConversationResponse]
+
+class TicketRatingRequest(BaseModel):
+    rating: float  # 1-5 star rating
+
+# For ticket reopening - just reopen the same ticket, don't need additional message
+class TicketReopenResponse(BaseModel):
+    message: str
+    ticket_id: int
+    status: str
