@@ -2,8 +2,8 @@
 
 import AdminDashboardLayout from "@/components/admin-dashboard-layout";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getStatusColor } from "@/utils";
 import { MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,8 @@ interface Ticket {
   status:
     | "Open"
     | "Work in Progress"
-    | "Action Required"
+    | "Student Action Required"
+    | "Admin Action Required"
     | "Resolved"
     | "Closed";
   title: string;
@@ -65,23 +66,6 @@ export default function AdminSupportPage() {
 
     fetchTickets();
   }, []);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Resolved":
-        return "bg-green-100 text-green-800";
-      case "Closed":
-        return "bg-blue-100 text-blue-800";
-      case "Open":
-        return "bg-yellow-100 text-yellow-800";
-      case "Work in Progress":
-        return "bg-orange-100 text-orange-800";
-      case "Action Required":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
 
   const filteredTickets = tickets.filter((ticket) => {
     if (activeTab === "resolved") {
@@ -223,9 +207,10 @@ export default function AdminSupportPage() {
                             {renderStars(ticket.rating)}
                           </div>
                         )}
-
                         <Badge className={getStatusColor(ticket.status)}>
-                          {ticket.status.toUpperCase()}
+                          {ticket.status === "Student Action Required"
+                            ? "WORK IN PROGRESS"
+                            : ticket.status.toUpperCase()}
                         </Badge>
                       </div>
                     </div>

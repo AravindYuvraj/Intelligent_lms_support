@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getStatusColor } from "@/utils";
 import { MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,7 +17,8 @@ interface Ticket {
   status:
     | "Open"
     | "Work in Progress"
-    | "Action Required"
+    | "Student Action Required"
+    | "Admin Action Required"
     | "Resolved"
     | "Closed";
   title: string;
@@ -61,23 +63,6 @@ export default function SupportPage() {
 
     fetchTickets();
   }, []);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Resolved":
-        return "bg-green-100 text-green-800";
-      case "Closed":
-        return "bg-blue-100 text-blue-800";
-      case "Open":
-        return "bg-yellow-100 text-yellow-800";
-      case "Work in Progress":
-        return "bg-orange-100 text-orange-800";
-      case "Action Required":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
 
   const filteredTickets = tickets.filter((ticket) => {
     if (activeTab === "resolved") {
@@ -186,52 +171,53 @@ export default function SupportPage() {
                 key={ticket.id}
                 className="hover:shadow-md transition-shadow"
               >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <Link
-                        href={`/support/ticket/${ticket.id}`}
-                        className="text-lg font-medium text-gray-900 hover:text-blue-600 transition-colors"
-                      >
+                <Link
+                  href={`/support/ticket/${ticket.id}`}
+                  className="text-lg font-medium text-gray-900 transition-colors"
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
                         {ticket.title}
-                      </Link>
 
-                      <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <MessageSquare className="h-4 w-4" />
+                        <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                          <div className="flex items-center space-x-1">
+                            <MessageSquare className="h-4 w-4" />
+                            <span>
+                              {ticket.response_count - 1} Response
+                              {ticket.response_count - 1 > 0 ? "s" : ""}
+                            </span>
+                          </div>
+                          <span>•</span>
+                          <span>{ticket.assigned_to || "Unassigned"}</span>
+                          <span>•</span>
                           <span>
-                            {ticket.response_count - 1} Response
-                            {ticket.response_count - 1 > 0 ? "s" : ""}
+                            Last Updated on{" "}
+                            {formatTimestamp(
+                              ticket.updated_at || ticket.created_at
+                            )}
                           </span>
                         </div>
-                        <span>•</span>
-                        <span>{ticket.assigned_to || "Unassigned"}</span>
-                        <span>•</span>
-                        <span>
-                          Last Updated on{" "}
-                          {formatTimestamp(
-                            ticket.updated_at || ticket.created_at
-                          )}
-                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-4">
+                        {ticket.rating && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-500">
+                              You rated
+                            </span>
+                            {renderStars(ticket.rating)}
+                          </div>
+                        )}
+                        <Badge className={getStatusColor(ticket.status)}>
+                          {ticket.status === "Admin Action Required"
+                            ? "WORK IN PROGRESS"
+                            : ticket.status.toUpperCase()}
+                        </Badge>
                       </div>
                     </div>
-
-                    <div className="flex items-center space-x-4">
-                      {ticket.rating && (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">
-                            You rated
-                          </span>
-                          {renderStars(ticket.rating)}
-                        </div>
-                      )}
-
-                      <Badge className={getStatusColor(ticket.status)}>
-                        {ticket.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                </Link>
               </Card>
             ))
           )}

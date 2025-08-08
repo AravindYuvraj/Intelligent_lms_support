@@ -440,7 +440,7 @@ class EnhancedLangGraphWorkflow:
                 "requires_escalation": True
             })
             
-            state["final_status"] = TicketStatus.ACTION_REQUIRED.value
+            state["final_status"] = TicketStatus.ADMIN_ACTION_REQUIRED.value
             state["steps_taken"].append("escalated_to_human")
             state["current_step"] = "escalate"
             
@@ -458,7 +458,7 @@ class EnhancedLangGraphWorkflow:
         try:
             # Determine final status
             if state.get("requires_escalation"):
-                final_status = TicketStatus.ACTION_REQUIRED.value
+                final_status = TicketStatus.ADMIN_ACTION_REQUIRED.value
             elif state.get("confidence_score", 0) >= 0.85:
                 final_status = TicketStatus.RESOLVED.value
             else:

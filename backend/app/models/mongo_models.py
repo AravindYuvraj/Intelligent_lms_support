@@ -16,7 +16,8 @@ class UserRole(Enum):
 class TicketStatus(Enum):
     OPEN = "Open"
     WIP = "Work in Progress"
-    ACTION_REQUIRED = "Action Required"
+    STUDENT_ACTION_REQUIRED = "Student Action Required"
+    ADMIN_ACTION_REQUIRED = "Admin Action Required"
     RESOLVED = "Resolved"
 
 class TicketCategory(Enum):
@@ -151,10 +152,9 @@ class TicketService(MongoBaseService):
             query = {"$or": [
                 {"assigned_to": admin_id},
                 {"assigned_to": None},
-                {"status": TicketStatus.ACTION_REQUIRED.value}
             ]}
         else:
-            query = {"status": TicketStatus.ACTION_REQUIRED.value}
+            query = {"status": TicketStatus.ADMIN_ACTION_REQUIRED.value}
         
         tickets = list(self.collection.find(query).sort("created_at", -1))
         for ticket in tickets:

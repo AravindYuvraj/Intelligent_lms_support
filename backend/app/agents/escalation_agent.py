@@ -26,7 +26,7 @@ class EscalationAgent:
                 # Assign ticket to admin
                 ticket_service.update_ticket_status(
                     ticket_id, 
-                    TicketStatus.ACTION_REQUIRED.value, 
+                    TicketStatus.ADMIN_ACTION_REQUIRED.value, 
                     admin["id"]
                 )
 
@@ -36,10 +36,15 @@ class EscalationAgent:
                 logger.info(f"Ticket {ticket_id} escalated to admin {admin['email']}")
             else:
                 # No admin available - mark as action required for any admin
-                ticket_service.update_ticket_status(ticket_id, TicketStatus.ACTION_REQUIRED.value)
+                ticket_service.update_ticket_status(ticket_id, TicketStatus.ADMIN_ACTION_REQUIRED.value)
                 logger.warning(f"No available admin found for ticket {ticket_id}")
             
             # Send generic message to student
+            if state.get("missing_information"):
+                ticket_service.update_ticket_status(
+                    ticket_id, 
+                    TicketStatus.STUDENT_ACTION_REQUIRED.value
+                )
             student_message = await self._create_student_message(state)
             conversation_service.create_conversation(
                 ticket_id=ticket_id,

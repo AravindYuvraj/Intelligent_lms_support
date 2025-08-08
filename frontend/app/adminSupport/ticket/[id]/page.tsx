@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { getStatusColor } from "@/utils";
 import { Bookmark, RotateCcw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -27,7 +28,8 @@ interface TicketDetail {
   status:
     | "Open"
     | "Work in Progress"
-    | "Action Required"
+    | "Student Action Required"
+    | "Admin Action Required"
     | "Resolved"
     | "Closed";
   title: string;
@@ -117,23 +119,6 @@ export default function AdminTicketDetailPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Resolved":
-        return "bg-green-100 text-green-800";
-      case "Closed":
-        return "bg-blue-100 text-blue-800";
-      case "Open":
-        return "bg-yellow-100 text-yellow-800";
-      case "Work in Progress":
-        return "bg-orange-100 text-orange-800";
-      case "Action Required":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   const ratingEmojis = ["😠", "😞", "😐", "😊", "😍"];
 
   const formatTimestamp = (timestamp: string) => {
@@ -207,7 +192,9 @@ export default function AdminTicketDetailPage() {
               {ticket.ticket.title}
             </h1>
             <Badge className={getStatusColor(ticket.ticket.status)}>
-              {ticket.ticket.status.toUpperCase()}
+              {ticket.ticket.status === "Student Action Required"
+                ? "WORK IN PROGRESS"
+                : ticket.ticket.status.toUpperCase()}
             </Badge>
           </div>
 
@@ -321,9 +308,13 @@ export default function AdminTicketDetailPage() {
             className="mt-3 bg-blue-600 text-white hover:bg-blue-700"
             onClick={async () => {
               const messageInput = document.querySelector("textarea");
-              const attachmentInput = document.getElementById("attachment-input") as HTMLInputElement;
+              const attachmentInput = document.getElementById(
+                "attachment-input"
+              ) as HTMLInputElement;
               const message = messageInput?.value;
-              const attachments = Array.from(attachmentInput?.files || []).map(file => file.name); // Just sending names for now
+              const attachments = Array.from(attachmentInput?.files || []).map(
+                (file) => file.name
+              ); // Just sending names for now
 
               if (message || attachments.length > 0) {
                 try {
