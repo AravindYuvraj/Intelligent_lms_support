@@ -106,7 +106,7 @@ class TicketWorkflow:
         try:
             # Update ticket status based on workflow outcome
             if state.get("requires_escalation") or state.get("error_message"):
-                ticket_service.update_ticket_status(ticket_id, TicketStatus.ACTION_REQUIRED.value)
+                ticket_service.update_ticket_status(ticket_id, TicketStatus.ADMIN_ACTION_REQUIRED.value)
             elif state.get("response") and state.get("confidence_score", 0) >= 0.85:
                 ticket_service.update_ticket_status(ticket_id, TicketStatus.RESOLVED.value)
                 
@@ -126,7 +126,7 @@ class TicketWorkflow:
     def _handle_workflow_error(self, ticket_id: str, error_message: str):
         """Handle workflow errors"""
         try:
-            ticket_service.update_ticket_status(ticket_id, TicketStatus.ACTION_REQUIRED.value)
+            ticket_service.update_ticket_status(ticket_id, TicketStatus.ADMIN_ACTION_REQUIRED.value)
             
             # Add error message to conversation
             conversation_service.create_conversation(

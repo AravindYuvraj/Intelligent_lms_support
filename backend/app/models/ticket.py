@@ -7,7 +7,8 @@ from backend.app.db.base import Base
 class TicketStatus(PyEnum):
     OPEN = "Open"
     WIP = "Work in Progress"
-    ACTION_REQUIRED = "Action Required"
+    STUDENT_ACTION_REQUIRED = "Student Action Required"
+    ADMIN_ACTION_REQUIRED = "Admin Action Required"
     RESOLVED = "Resolved"
 
 class TicketCategory(PyEnum):

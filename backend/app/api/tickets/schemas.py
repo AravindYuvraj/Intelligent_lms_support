@@ -73,3 +73,7 @@ class TicketReopenResponse(BaseModel):
     message: str
     ticket_id: int
     status: str
+
+class TicketMessageRequest(BaseModel):
+    message: str
+    attachments: Optional[List[str]] = None

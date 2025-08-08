@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/dashboard-layout";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getStatusColor } from "@/utils";
 import { Bookmark, RotateCcw } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Message {
   id: string;
@@ -27,7 +28,8 @@ interface TicketDetail {
   status:
     | "Open"
     | "Work in Progress"
-    | "Action Required"
+    | "Student Action Required"
+    | "Admin Action Required"
     | "Resolved"
     | "Closed";
   title: string;
@@ -117,37 +119,20 @@ export default function TicketDetailPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Resolved":
-        return "bg-green-100 text-green-800";
-      case "Closed":
-        return "bg-blue-100 text-blue-800";
-      case "Open":
-        return "bg-yellow-100 text-yellow-800";
-      case "Work in Progress":
-        return "bg-orange-100 text-orange-800";
-      case "Action Required":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   const ratingEmojis = ["😠", "😞", "😐", "😊", "😍"];
 
-const formatTimestamp = (timestamp: string) => {
-  const date = new Date(timestamp);
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-};
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  };
 
   const formatSenderName = (email: string | undefined, role: string) => {
     if (email) {
@@ -207,7 +192,9 @@ const formatTimestamp = (timestamp: string) => {
               {ticket.ticket.title}
             </h1>
             <Badge className={getStatusColor(ticket.ticket.status)}>
-              {ticket.ticket.status.toUpperCase()}
+              {ticket.ticket.status === "Admin Action Required"
+                ? "WORK IN PROGRESS"
+                : ticket.ticket.status.toUpperCase()}
             </Badge>
           </div>
 
@@ -311,13 +298,27 @@ const formatTimestamp = (timestamp: string) => {
             placeholder="Type your message here..."
             rows={4}
           ></textarea>
+          <input
+            type="file"
+            multiple
+            className="mt-3 p-2 border rounded-lg"
+            id="attachment-input"
+          />
           <Button
             className="mt-3 bg-blue-600 text-white hover:bg-blue-700"
             onClick={async () => {
-              const message = document.querySelector("textarea")?.value;
-              if (message) {
+              const messageInput = document.querySelector("textarea");
+              const attachmentInput = document.getElementById(
+                "attachment-input"
+              ) as HTMLInputElement;
+              const message = messageInput?.value;
+              const attachments = Array.from(attachmentInput?.files || []).map(
+                (file) => file.name
+              ); // Just sending names for now
+
+              if (message || attachments.length > 0) {
                 try {
-                  await fetch(
+                  const response = await fetch(
                     `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/messages`,
                     {
                       method: "POST",
@@ -325,10 +326,26 @@ const formatTimestamp = (timestamp: string) => {
                         "Content-Type": "application/json",
                       },
                       credentials: "include",
-                      body: JSON.stringify({ message }),
+                      body: JSON.stringify({ message, attachments }),
                     }
                   );
-                  router.refresh();
+                  if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                  }
+                  const newMessage = await response.json();
+                  setTicket((prevTicket) => {
+                    if (!prevTicket) return null;
+                    return {
+                      ...prevTicket,
+                      conversations: [...prevTicket.conversations, newMessage],
+                    };
+                  });
+                  if (messageInput) {
+                    messageInput.value = ""; // Clear the textarea
+                  }
+                  if (attachmentInput) {
+                    attachmentInput.value = ""; // Clear the file input
+                  }
                 } catch (error) {
                   console.error("Failed to send message:", error);
                 }
