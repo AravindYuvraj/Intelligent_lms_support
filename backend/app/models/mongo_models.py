@@ -126,9 +126,10 @@ class TicketService(MongoBaseService):
         except:
             return None
     
-    def get_user_tickets(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_tickets(self, user_id: str, role:str) -> List[Dict[str, Any]]:
         """Get all tickets for a user"""
-        tickets = list(self.collection.find({"user_id": user_id}).sort("created_at", -1))
+        query = {"assigned_to": user_id} if role == "admin" else {"user_id": user_id}
+        tickets = list(self.collection.find(query).sort("created_at", -1))        
         for ticket in tickets:
             ticket["id"] = str(ticket["_id"])
         return tickets

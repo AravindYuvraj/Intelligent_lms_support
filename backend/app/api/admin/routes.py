@@ -119,7 +119,7 @@ async def upload_document(
     """Upload a document to the knowledge base"""
     
     # Validate category
-    valid_categories = ["Program Details", "Q&A", "Curriculum Documents"]
+    valid_categories = ["program_details_documents", "qa_documents", "curriculum_documents"]
     if category not in valid_categories:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

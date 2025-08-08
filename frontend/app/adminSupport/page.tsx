@@ -1,6 +1,6 @@
 "use client";
 
-import DashboardLayout from "@/components/dashboard-layout";
+import AdminDashboardLayout from "@/components/admin-dashboard-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,15 +30,19 @@ interface Ticket {
   last_response_time?: string;
 }
 
-export default function SupportPage() {
+export default function AdminSupportPage() {
   const [activeTab, setActiveTab] = useState<"unresolved" | "resolved">(
     "unresolved"
   );
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
+    const role = localStorage.getItem("userRole");
+    setUserRole(role);
+
     const fetchTickets = async () => {
       try {
         const response = await fetch(
@@ -105,11 +109,11 @@ export default function SupportPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <AdminDashboardLayout>
         <div className="p-6 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
-      </DashboardLayout>
+      </AdminDashboardLayout>
     );
   }
 
@@ -127,17 +131,12 @@ export default function SupportPage() {
   };
 
   return (
-    <DashboardLayout>
+    <AdminDashboardLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">
             Support Tickets
           </h1>
-          <Link href="/support/create">
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              CREATE TICKET
-            </Button>
-          </Link>
         </div>
 
         {/* Tabs */}
@@ -186,57 +185,57 @@ export default function SupportPage() {
                 key={ticket.id}
                 className="hover:shadow-md transition-shadow"
               >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <Link
-                        href={`/support/ticket/${ticket.id}`}
-                        className="text-lg font-medium text-gray-900 hover:text-blue-600 transition-colors"
-                      >
+                <Link
+                  href={`/adminSupport/ticket/${ticket.id}`}
+                  className="text-lg font-medium text-gray-900 hover:text-blue-600 transition-colors"
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
                         {ticket.title}
-                      </Link>
 
-                      <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <MessageSquare className="h-4 w-4" />
+                        <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                          <div className="flex items-center space-x-1">
+                            <MessageSquare className="h-4 w-4" />
+                            <span>
+                              {ticket.response_count - 1} Response
+                              {ticket.response_count - 1 > 0 ? "s" : ""}
+                            </span>
+                          </div>
+                          <span>•</span>
+                          <span>{ticket.assigned_to || "Unassigned"}</span>
+                          <span>•</span>
                           <span>
-                            {ticket.response_count - 1} Response
-                            {ticket.response_count - 1 > 0 ? "s" : ""}
+                            Last Updated on{" "}
+                            {formatTimestamp(
+                              ticket.updated_at || ticket.created_at
+                            )}
                           </span>
                         </div>
-                        <span>•</span>
-                        <span>{ticket.assigned_to || "Unassigned"}</span>
-                        <span>•</span>
-                        <span>
-                          Last Updated on{" "}
-                          {formatTimestamp(
-                            ticket.updated_at || ticket.created_at
-                          )}
-                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-4">
+                        {ticket.rating && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-500">
+                              You rated
+                            </span>
+                            {renderStars(ticket.rating)}
+                          </div>
+                        )}
+
+                        <Badge className={getStatusColor(ticket.status)}>
+                          {ticket.status.toUpperCase()}
+                        </Badge>
                       </div>
                     </div>
-
-                    <div className="flex items-center space-x-4">
-                      {ticket.rating && (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">
-                            You rated
-                          </span>
-                          {renderStars(ticket.rating)}
-                        </div>
-                      )}
-
-                      <Badge className={getStatusColor(ticket.status)}>
-                        {ticket.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                </Link>
               </Card>
             ))
           )}
         </div>
       </div>
-    </DashboardLayout>
+    </AdminDashboardLayout>
   );
 }

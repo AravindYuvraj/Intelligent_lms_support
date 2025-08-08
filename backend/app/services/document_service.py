@@ -78,18 +78,8 @@ class DocumentService:
                     "original_filename": file.filename
                 }
             }
-            
-            # Map to our 3 knowledge base categories
-            valid_categories = {
-                "Program Details": "program_details_documents",
-                "Q&A": "qa_documents", 
-                "Curriculum Documents": "curriculum_documents"
-            }
-            
-            if category not in valid_categories:
-                raise ValueError(f"Invalid category. Must be one of: {list(valid_categories.keys())}")
-                
-            collection_name = valid_categories[category]
+             
+            collection_name = category
             collection = self.mongodb[collection_name]
             collection.insert_one(document)
             

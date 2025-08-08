@@ -1,53 +1,60 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: email, password }),
-        credentials: 'include'
-      })
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE}/v1/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: email, password }),
+          credentials: "include",
+        }
+      );
       const data = await response.json();
       if (response.ok && data.session_token) {
-        localStorage.setItem('authToken', data.session_token);
-        localStorage.setItem('userRole', data.role);
-        localStorage.setItem('userEmail', data.email);
-        setError('');
-        router.push('/unavailable?label=Dashboard')
+        localStorage.setItem("authToken", data.session_token);
+        localStorage.setItem("userRole", data.role);
+        localStorage.setItem("userEmail", data.email);
+        setError("");
+        if (data.role === "admin") {
+          router.push("/admin");
+        } else {
+          router.push("/unavailable?label=Dashboard");
+        }
       } else {
-        let msg = 'Invalid email or password';
+        let msg = "Invalid email or password";
         if (data?.detail) msg = data.detail;
         else if (data?.message) msg = data.message;
         setError(msg);
       }
     } catch (err) {
-      setError('Login failed. Please try again.')
+      setError("Login failed. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <Card className="w-full">
@@ -93,10 +100,10 @@ export default function LoginForm() {
             className="w-full bg-blue-600 hover:bg-blue-700"
             disabled={isLoading}
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? "Signing in..." : "Sign In"}
           </Button>
         </form>
       </CardContent>
     </Card>
-  )
+  );
 }

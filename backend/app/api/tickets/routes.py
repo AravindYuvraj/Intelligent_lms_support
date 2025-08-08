@@ -47,10 +47,10 @@ async def create_ticket(
 
 @router.get("/my_tickets", response_model=List[TicketListResponse])
 async def get_my_tickets(
-    current_user: Dict[str, Any] = Depends(get_current_student)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     # Get user tickets
-    tickets = ticket_service.get_user_tickets(current_user["id"])
+    tickets = ticket_service.get_user_tickets(current_user["id"], current_user["role"])
     
     result = []
     for ticket in tickets:
