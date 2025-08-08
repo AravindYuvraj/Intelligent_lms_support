@@ -5,6 +5,7 @@ from bson import ObjectId
 from pymongo import MongoClient
 from backend.app.db.base import get_mongodb
 import logging
+from zoneinfo import ZoneInfo 
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class UserService(MongoBaseService):
             "email": email,
             "password_hash": password_hash,
             "role": role,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
         
         result = self.collection.insert_one(user_doc)
@@ -108,8 +109,8 @@ class TicketService(MongoBaseService):
             "attachments": attachments or [],
             "assigned_to": None,
             "rating": None,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(ZoneInfo("Asia/Kolkata")),
+            "updated_at": datetime.now(ZoneInfo("Asia/Kolkata")),
         }
         
         result = self.collection.insert_one(ticket_doc)
@@ -125,9 +126,10 @@ class TicketService(MongoBaseService):
         except:
             return None
     
-    def get_user_tickets(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_tickets(self, user_id: str, role:str) -> List[Dict[str, Any]]:
         """Get all tickets for a user"""
-        tickets = list(self.collection.find({"user_id": user_id}).sort("created_at", -1))
+        query = {"assigned_to": user_id} if role == "admin" else {"user_id": user_id}
+        tickets = list(self.collection.find(query).sort("created_at", -1))        
         for ticket in tickets:
             ticket["id"] = str(ticket["_id"])
         return tickets
@@ -151,7 +153,7 @@ class TicketService(MongoBaseService):
     def update_ticket(self, ticket_id: str, update_data: Dict[str, Any]) -> bool:
         """Update ticket"""
         try:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(ZoneInfo("Asia/Kolkata"))
             result = self.collection.update_one(
                 {"_id": ObjectId(ticket_id)}, 
                 {"$set": update_data}
@@ -185,7 +187,7 @@ class ConversationService(MongoBaseService):
             "sender_id": sender_id,
             "message": message,
             "confidence_score": confidence_score,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
         
         result = self.collection.insert_one(conversation_doc)

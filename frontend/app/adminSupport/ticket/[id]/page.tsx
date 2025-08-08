@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import DashboardLayout from "@/components/dashboard-layout";
+import AdminDashboardLayout from "@/components/admin-dashboard-layout";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bookmark, RotateCcw } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Message {
   id: string;
@@ -47,7 +47,7 @@ interface TicketDetailResponse {
   conversations: Message[];
 }
 
-export default function TicketDetailPage() {
+export default function AdminTicketDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
@@ -136,18 +136,18 @@ export default function TicketDetailPage() {
 
   const ratingEmojis = ["😠", "😞", "😐", "😊", "😍"];
 
-const formatTimestamp = (timestamp: string) => {
-  const date = new Date(timestamp);
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-};
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  };
 
   const formatSenderName = (email: string | undefined, role: string) => {
     if (email) {
@@ -172,17 +172,17 @@ const formatTimestamp = (timestamp: string) => {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <AdminDashboardLayout>
         <div className="p-6 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
-      </DashboardLayout>
+      </AdminDashboardLayout>
     );
   }
 
   if (!ticket) {
     return (
-      <DashboardLayout>
+      <AdminDashboardLayout>
         <div className="p-6">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-gray-900">
@@ -193,12 +193,12 @@ const formatTimestamp = (timestamp: string) => {
             </p>
           </div>
         </div>
-      </DashboardLayout>
+      </AdminDashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
+    <AdminDashboardLayout>
       <div className="p-6 max-w-4xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -380,6 +380,6 @@ const formatTimestamp = (timestamp: string) => {
           </Card>
         )}
       </div>
-    </DashboardLayout>
+    </AdminDashboardLayout>
   );
 }

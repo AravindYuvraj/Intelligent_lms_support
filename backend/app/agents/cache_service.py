@@ -6,6 +6,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from backend.app.db.base import get_redis
 from backend.app.core.config import settings
 import logging
+from zoneinfo import ZoneInfo 
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class SemanticCacheService:
                 "category": category,
                 "embedding": query_embedding,
                 "metadata": metadata or {},
-                "timestamp": int(datetime.now().timestamp())
+                "timestamp": int(datetime.now(ZoneInfo("Asia/Kolkata")))
             }
             
             # Store in Redis with expiration (7 days)

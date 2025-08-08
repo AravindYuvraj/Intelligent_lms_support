@@ -32,7 +32,7 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function AdminDashboardLayout({ children }: DashboardLayoutProps) {
   // const [userRole, setUserRole] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   // const [notifications, setNotifications] = useState(3);
@@ -54,23 +54,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   const navigationItems = [
-    { icon: LayoutDashboard, label: "Dashboard" },
-    { icon: Bell, label: "Announcements" },
-    { icon: BookOpen, label: "Lectures" },
-    { icon: BookOpen, label: "Blended Learning" },
-    { icon: FileText, label: "Assignments" },
-    { icon: HelpCircle, label: "Quiz" },
-    { icon: Users, label: "Discussions" },
-    { icon: Users, label: "MasaiVerse - Community" },
-    { icon: Users, label: "Changemakers Circle" },
-    { icon: MessageSquare, label: "Support Ticket", baseHref: "/support" },
-  ].map((item) => ({
-    ...item,
-    href:
-      item.label === "Support Ticket"
-        ? item.baseHref
-        : `/unavailable?label=${encodeURIComponent(item.label)}`,
-  }));
+    { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
+    { icon: FileText, label: "Support Documents", href:"/admin/documents" },
+    { icon: MessageSquare, label: "Support Ticket", href: "/adminSupport" },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-1 flex-row">
