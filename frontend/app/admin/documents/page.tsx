@@ -67,7 +67,7 @@ const categoryGuides: CategoryGuide[] = [
     ],
   },
   {
-    category: "faq_documents",
+    category: "qa_documents",
     label: "FAQ",
     subcategories: [
       { name: "Product Support" },

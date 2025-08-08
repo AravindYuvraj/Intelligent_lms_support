@@ -8,7 +8,6 @@ from enum import Enum
 import asyncio
 import logging
 from datetime import datetime
-
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -16,13 +15,10 @@ from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
-
 from backend.app.models import ticket_service, conversation_service, user_service, TicketStatus
 from backend.app.core.config import settings
 from .cache_service import SemanticCacheService
-from .routing_agent import RoutingAgent
 from .retriever_agent import RetrieverAgent
-from .response_agent import ResponseAgent
 from .escalation_agent import EscalationAgent
 
 logger = logging.getLogger(__name__)
@@ -94,11 +90,8 @@ class EnhancedLangGraphWorkflow:
         self.cache_service = SemanticCacheService()
         
         # Initialize agents
-        self.routing_agent = RoutingAgent()
         self.retriever_agent = RetrieverAgent()
-        self.response_agent = ResponseAgent()
         self.escalation_agent = EscalationAgent()
-        
         # Build the graph
         self.workflow = self._build_workflow()
     
@@ -164,18 +157,19 @@ class EnhancedLangGraphWorkflow:
         """Initialize the workflow state with ticket information"""
         try:
             ticket = ticket_service.get_ticket_by_id(state["ticket_id"])
-            print(f"Initializing state for ticket {state['ticket_id']}...", ticket)
+            print(f"Initializing state for ticket {state['ticket_id']}...")
             if not ticket:
                 raise ValueError(f"Ticket {state['ticket_id']} not found")
-            
+                        
+            # The 'category' field is loaded directly from the ticket.
+            # This might be a granular category like "IA Support" or "Course Query".
+            # The RetrieverAgent is responsible for mapping this to a KB category.
+            state["category"] = ticket["category"]
             user = user_service.get_user_by_id(ticket["user_id"])
             conversations = conversation_service.get_ticket_conversations(state["ticket_id"])
             
             # Initialize messages for LangGraph
             messages = [
-                SystemMessage(content="""You are an intelligent support agent for Masai School LMS. 
-                Your role is to help students with their queries about courses, evaluations, 
-                technical issues, and administrative matters."""),
                 HumanMessage(content=ticket["message"])
             ]
             
@@ -214,7 +208,7 @@ class EnhancedLangGraphWorkflow:
         """Check semantic cache for similar resolved queries"""
         try:
             cached_result = await self.cache_service.search_similar(
-                state["processed_query"], 
+                state["original_query"], 
                 threshold=0.85
             )
             print(f"Cache check for ticket {state['ticket_id']}...", cached_result)
@@ -245,35 +239,33 @@ class EnhancedLangGraphWorkflow:
             return state
     
     async def route_query(self, state: GraphState) -> GraphState:
-        """Intelligent query routing with classification"""
+        """Intelligent query routing with classification and error handling."""
         try:
-            # Use structured output parsing
             parser = PydanticOutputParser(pydantic_object=RoutingDecision)
             
             routing_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a query router for Masai School LMS support.
-                Classify queries and determine the appropriate admin type.
-                
-                EC (Experience Champion) handles:
-                - Course content, attendance, leaves, evaluations
-                - Placements, industry projects, career guidance
-                - ISA/NBFC financial matters
-                
-                IA (Instructor Associate) handles:
-                - Technical interviews, coding assignments
-                - DSA problems, technical doubts
-                - Code reviews and technical support
+                ("system", """You are a master query router for Masai School LMS support. Your task is to analyze the student's query and classify it for the correct support team.
+
+                **EC (Experience Champion)** handles:
+                - Course logistics: Content, attendance, leaves, evaluations
+                - Career support: Placements, industry projects, career guidance
+                - Financial matters: ISA/NBFC
+
+                **IA (Instructor Associate)** handles:
+                - Technical issues: Interviews, coding assignments, DSA problems
+                - Academic support: Code reviews, technical doubts
+
+                Based on the query, decide the admin type, identify any critical missing information, and determine if it requires immediate escalation.
+                Respond strictly in the requested JSON format.
                 
                 {format_instructions}"""),
-                ("human", """Query: {query}
-                Category: {category}
-                Subcategory: {subcategory}""")
+                ("human", "Query: {query}\nCategory: {category}\nSubcategory Data: {subcategory}")
             ])
             
             chain = routing_prompt | self.llm | parser
             
             routing_decision = await chain.ainvoke({
-                "query": state["processed_query"],
+                "query": state["original_query"], # Use original query for routing context
                 "category": state["category"],
                 "subcategory": str(state.get("subcategory_data", {})),
                 "format_instructions": parser.get_format_instructions()
@@ -281,12 +273,12 @@ class EnhancedLangGraphWorkflow:
             
             state["admin_type"] = routing_decision.admin_type
             state["missing_information"] = routing_decision.missing_info
-            state["requires_escalation"] = routing_decision.requires_escalation
+            state["requires_escalation"] = routing_decision.requires_escalation or state.get("requires_escalation", False)
             state["confidence_score"] = routing_decision.confidence
             state["steps_taken"].append(f"routed_to_{routing_decision.admin_type}")
             
-            # Query decomposition for better retrieval
-            decomposed = await self._decompose_query(state["processed_query"])
+            # Decompose query for better retrieval
+            decomposed = await self._decompose_query(state["original_query"])
             state["processed_query"] = decomposed
             
             state["current_step"] = "route_query"
@@ -294,78 +286,79 @@ class EnhancedLangGraphWorkflow:
             
             return state
             
-        except Exception as e:
-            logger.error(f"Routing error: {str(e)}")
-            state["error_message"] = str(e)
-            state["requires_escalation"] = True
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error(f"Routing error (likely JSON parsing failed): {str(e)}")
+            state["error_message"] = "Failed to parse routing decision from LLM."
+            state["requires_escalation"] = True # Escalate if routing fails
+            # Default to a general admin type
+            state["admin_type"] = "EC"
+            # Use the original query if decomposition fails
+            state["processed_query"] = state["original_query"]
             return state
-    
+        
     async def retrieve_context(self, state: GraphState) -> GraphState:
-        """Enhanced context retrieval with re-ranking"""
+        """
+        Retrieve context using the RetrieverAgent.
+        The agent will internally map the state's category to the correct knowledge base.
+        """
         try:
-            # Use the retriever agent
-            retriever_state = await self.retriever_agent.process({
-                "ticket_id": state["ticket_id"],
-                "user_id": state["user_id"],
-                "query": state["processed_query"],
-                "category": state["category"],
-                "subcategory_data": state.get("subcategory_data"),
-                "attachments": state.get("attachments"),
-                "current_step": "retrieval",
-                "conversation_history": state["conversation_history"],
-                "ticket_status": state["ticket_status"]
-            })
+            logger.info(f"Calling RetrieverAgent for ticket {state['ticket_id']} with category: '{state['category']}'")
             
+            # The entire state is passed to the agent. The agent's `process` method
+            # is designed to work with this state structure. It will look at the
+            # `category` field and perform the necessary mapping to find the correct
+            # Pinecone index to query.
+            retriever_state = await self.retriever_agent.process(state)
+            
+            # Update the main graph state with the results from the agent
             state["retrieved_context"] = retriever_state.get("retrieved_context", [])
             state["steps_taken"].append("context_retrieved")
             state["current_step"] = "retrieve_context"
             
             logger.info(f"Retrieved {len(state['retrieved_context'])} context chunks for ticket {state['ticket_id']}")
-            
             return state
             
         except Exception as e:
-            logger.error(f"Retrieval error: {str(e)}")
+            logger.error(f"Retrieval error: {str(e)}", exc_info=True)
             state["error_message"] = str(e)
             state["retrieved_context"] = []
+            state["requires_escalation"] = True # Escalate if retrieval fails
             return state
-    
+        
+            
     async def generate_response(self, state: GraphState) -> GraphState:
-        """Generate response using retrieved context and chat history"""
+        """Generate a helpful response using a clear persona and retrieved context."""
         try:
-            # Prepare context
             context_text = self._format_context(state.get("retrieved_context", []))
             
             response_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a helpful support agent for Masai School LMS.
-                Use the provided context to answer the student's query accurately.
-                Be specific, actionable, and maintain a professional yet friendly tone.
-                If the context doesn't fully address the query, acknowledge this."""),
-                ("system", f"Available Context:\n{context_text}"),
-                MessagesPlaceholder("messages"),
-                ("human", "{query}")
+                ("system", """You are 'Masai Helper', a friendly and professional AI support agent for Masai School. Your goal is to provide accurate and helpful answers to student queries.
+
+                **Your Persona & Rules:**
+                1.  **Be Helpful and Accurate:** Use the provided "Available Context" to construct your answer.
+                2.  **NEVER Fabricate:** If the context does not contain the answer, or if no context is provided, you MUST state that you don't have the information. Do not make up dates, policies, or procedures.
+                3.  **Acknowledge Missing Context:** If the context seems irrelevant or is missing, explicitly say, "I couldn't find specific information about this in our knowledge base, but I've forwarded your query to our support team."
+                4.  **Be Actionable:** Provide clear next steps for the student if possible.
+
+                ---
+                Available Context:
+                {context}
+                ---
+                """),
+                MessagesPlaceholder(variable_name="messages"),
             ])
-            
+
             chain = response_prompt | self.llm
             
             response = await chain.ainvoke({
+                "context": context_text,
                 "messages": state["messages"],
-                "query": state["original_query"]
             })
             
             state["response"] = response.content
             state["messages"].append(AIMessage(content=response.content))
             state["steps_taken"].append("response_generated")
             state["current_step"] = "generate_response"
-            
-            # Store in cache if high quality
-            if state.get("confidence_score", 0) >= 0.85:
-                await self.cache_service.store_response(
-                    query=state["original_query"],
-                    response=state["response"],
-                    confidence=state["confidence_score"],
-                    category=state["category"]
-                )
             
             logger.info(f"Generated response for ticket {state['ticket_id']}")
             
@@ -374,10 +367,10 @@ class EnhancedLangGraphWorkflow:
         except Exception as e:
             logger.error(f"Response generation error: {str(e)}")
             state["error_message"] = str(e)
-            state["response"] = "I apologize, but I'm having trouble generating a response. Your query has been escalated to our support team."
+            state["response"] = "I apologize, but I encountered an error while generating a response. Your query has been escalated to our human support team who will get back to you shortly."
             state["requires_escalation"] = True
             return state
-    
+        
     async def assess_quality(self, state: GraphState) -> GraphState:
         """Assess response quality and determine if escalation is needed"""
         try:
@@ -537,15 +530,26 @@ class EnhancedLangGraphWorkflow:
         return result.content
     
     async def _decompose_query(self, query: str) -> str:
-        """Decompose query for better retrieval"""
+        """Decompose query into concise keywords for better retrieval."""
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "Extract key search terms and concepts from this support query for knowledge base retrieval."),
-            ("human", "{query}")
+            ("system", """You are an expert at refining search queries. Your task is to transform a student's conversational query into a concise set of keywords and phrases for a semantic vector search.
+
+            **Instructions:**
+            1.  Remove all pleasantries and conversational filler (e.g., 'hello', 'sir', 'please help').
+            2.  Focus on the core technical terms, feature names, and the essential problem.
+            3.  Keep important entities like 'Campus Connect', 'June', 'May'.
+            4.  The output should be a clean, keyword-focused string.
+
+            **Example:**
+            - **Original:** "sir i Just got a mail regarding the campus connect in may. But there was another opt in June . So will there be another day in June ??"
+            - **Decomposed:** "Campus Connect May June schedule dates"
+            """),
+            ("human", "Original Query: {query}")
         ])
         
         chain = prompt | self.llm
         result = await chain.ainvoke({"query": query})
-        return result.content
+        return result.content.strip()
     
     def _format_context(self, context_chunks: List[Dict[str, Any]]) -> str:
         """Format retrieved context for prompt"""
@@ -589,6 +593,3 @@ async def process_ticket_async(ticket_id: str):
     print(f"Processing ticket {ticket_id} through LangGraph workflow...")
     return await workflow_instance.process_ticket(ticket_id)
 
-def process_ticket_sync(ticket_id: str):
-    """Sync wrapper for background task processing"""
-    asyncio.run(process_ticket_async(ticket_id))

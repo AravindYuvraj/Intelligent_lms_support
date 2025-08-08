@@ -117,7 +117,7 @@ async def upload_document(
     current_user: Dict[str, Any] = Depends(get_current_admin)
 ):
     """Upload a document to the knowledge base"""
-    
+    print("Uploading document:", file.filename, "to category:", category)
     # Validate category
     valid_categories = ["program_details_documents", "qa_documents", "curriculum_documents"]
     if category not in valid_categories:
@@ -129,6 +129,7 @@ async def upload_document(
     try:
         document_service = DocumentService()
         result = await document_service.upload_document(file, category)
+        print("Document upload result:", result)
         return {
             "message": "Document uploaded successfully",
             "document_id": result["document_id"],
@@ -168,7 +169,7 @@ async def list_documents(
     """List documents in the knowledge base"""
     
     if category:
-        valid_categories = ["Program Details", "Q&A", "Curriculum Documents"]
+        valid_categories = ["program_details_documents", "qa_documents", "curriculum_documents"]
         if category not in valid_categories:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -178,7 +179,7 @@ async def list_documents(
     try:
         document_service = DocumentService()
         documents = await document_service.list_documents(category)
-        return {"documents": documents, "categories": ["Program Details", "Q&A", "Curriculum Documents"]}
+        return {"documents": documents, "categories": ["program_details_documents", "qa_documents", "curriculum_documents"]}
     except Exception as e:
         logger.error(f"Document listing error: {str(e)}")
         raise HTTPException(
