@@ -34,3 +34,5 @@ class WorkflowStep(Enum):
     RESPONSE_GENERATION = "response_generation"
     ESCALATION = "escalation"
     COMPLETION = "completion"
+
+    

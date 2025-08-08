@@ -7,17 +7,20 @@ from .schemas import (
     TicketDetailResponse, ConversationResponse, TicketRatingRequest,
     TicketReopenResponse
 )
-from backend.app.agents.langgraph_workflow import process_ticket_sync
+from backend.app.agents.langgraph_workflow import process_ticket_async
 
 router = APIRouter()
 
+# -------------------------------
+# STUDENT: Create a new ticket
+# -------------------------------
 @router.post("/create", response_model=dict)
 async def create_ticket(
     ticket_data: TicketCreateRequest,
     background_tasks: BackgroundTasks,
     current_user: Dict[str, Any] = Depends(get_current_student)
 ):
-    # Create new ticket
+    # Student creates a new ticket with details
     ticket_id = ticket_service.create_ticket(
         user_id=current_user["id"],
         category=ticket_data.category,
@@ -29,7 +32,7 @@ async def create_ticket(
         attachments=ticket_data.attachments or []
     )
     
-    # Add initial conversation entry
+    # Add the first message to the ticket's conversation
     conversation_service.create_conversation(
         ticket_id=ticket_id,
         sender_role="student",
@@ -37,8 +40,8 @@ async def create_ticket(
         message=ticket_data.message
     )
     
-    # Process ticket through enhanced LangGraph workflow in background
-    background_tasks.add_task(process_ticket_sync, ticket_id)
+    # Start background processing for the ticket (AI workflow)
+    background_tasks.add_task(process_ticket_async, ticket_id)
     
     return {
         "message": "Ticket submitted successfully",
@@ -120,11 +123,11 @@ async def get_my_tickets(
     
     result = []
     for ticket in tickets:
-        # Get conversation count and last response
+        # Get number of responses and last message for each ticket
         response_count = conversation_service.get_conversation_count(ticket["id"])
         last_conversation = conversation_service.get_last_conversation(ticket["id"])
         
-        # Get assigned admin email if exists
+        # Get assigned admin's email if ticket is assigned
         assigned_admin_email = None
         if ticket.get("assigned_to"):
             admin = user_service.get_user_by_id(ticket["assigned_to"])
@@ -149,12 +152,15 @@ async def get_my_tickets(
     
     return result
 
+# -------------------------------------------------
+# STUDENT or ADMIN: Get details of a specific ticket
+# -------------------------------------------------
 @router.get("/{ticket_id}", response_model=TicketDetailResponse)
 async def get_ticket_detail(
     ticket_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    # Get ticket
+    # Fetch ticket details by ID
     ticket = ticket_service.get_ticket_by_id(ticket_id)
     if not ticket:
         raise HTTPException(
@@ -162,7 +168,7 @@ async def get_ticket_detail(
             detail="Ticket not found"
         )
     
-    # Check permissions
+    # Only the student who created the ticket or the assigned admin can view
     if (current_user["role"] == "student" and ticket["user_id"] != current_user["id"]):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -175,7 +181,7 @@ async def get_ticket_detail(
         # Allow admins to see unassigned tickets
         pass
     
-    # Get conversations with sender details
+    # Get all conversations/messages for this ticket
     conversations = conversation_service.get_ticket_conversations(ticket_id)
     
     conversations_response = []
@@ -217,13 +223,16 @@ async def get_ticket_detail(
         conversations=conversations_response
     )
 
+# -------------------------------------------
+# STUDENT: Reopen a resolved ticket
+# -------------------------------------------
 @router.post("/{ticket_id}/reopen", response_model=TicketReopenResponse)
 async def reopen_ticket(
     ticket_id: str,
     background_tasks: BackgroundTasks,
     current_user: Dict[str, Any] = Depends(get_current_student)
 ):
-    # Get ticket
+    # Student can reopen their own resolved ticket
     ticket = ticket_service.get_ticket_by_id(ticket_id)
     if not ticket or ticket["user_id"] != current_user["id"]:
         raise HTTPException(
@@ -237,10 +246,10 @@ async def reopen_ticket(
             detail="Only resolved tickets can be reopened"
         )
     
-    # Reopen ticket
+    # Change ticket status to open
     ticket_service.update_ticket_status(ticket_id, TicketStatus.OPEN.value, None)
     
-    # Add conversation entry for reopening
+    # Add a message indicating the ticket was reopened
     conversation_service.create_conversation(
         ticket_id=ticket_id,
         sender_role="student",
@@ -248,7 +257,7 @@ async def reopen_ticket(
         message="Ticket reopened by student"
     )
     
-    # Process reopened ticket through enhanced LangGraph workflow
+    # Start background processing for the reopened ticket
     background_tasks.add_task(process_ticket_sync, ticket_id)
     
     return TicketReopenResponse(
@@ -257,13 +266,16 @@ async def reopen_ticket(
         status=TicketStatus.OPEN.value
     )
 
+# -------------------------------------------
+# STUDENT: Rate a resolved ticket
+# -------------------------------------------
 @router.post("/{ticket_id}/rate", response_model=dict)
 async def rate_ticket(
     ticket_id: str,
     rating_data: TicketRatingRequest,
     current_user: Dict[str, Any] = Depends(get_current_student)
 ):
-    # Get ticket
+    # Student can rate their own resolved ticket
     ticket = ticket_service.get_ticket_by_id(ticket_id)
     if not ticket or ticket["user_id"] != current_user["id"]:
         raise HTTPException(
@@ -277,7 +289,7 @@ async def rate_ticket(
             detail="Only resolved tickets can be rated"
         )
     
-    # Update rating
+    # Save the rating for the ticket
     ticket_service.rate_ticket(ticket_id, rating_data.rating)
     
     return {"message": "Rating submitted successfully"}
