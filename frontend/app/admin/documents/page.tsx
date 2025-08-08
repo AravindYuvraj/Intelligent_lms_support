@@ -60,7 +60,6 @@ const categoryGuides: CategoryGuide[] = [
     label: "Curriculum Documents",
     subcategories: [
       { name: "Evaluation Score" },
-      { name: "Code Review" },
       { name: "MAC", description: "Masai Additional Curriculum" },
       { name: "Revision", description: "Course content revision" },
       { name: "IA Support", description: "Technical support from IA" },
@@ -75,6 +74,7 @@ const categoryGuides: CategoryGuide[] = [
       { name: "Feedback" },
       { name: "Referral" },
       { name: "Personal Query" },
+      { name: "Code Review" },
       { name: "Placement Support - Placements" },
       { name: "Offer Stage- Placements" },
       { name: "ISA/EMI/NBFC/Glide Related - Placements" },
