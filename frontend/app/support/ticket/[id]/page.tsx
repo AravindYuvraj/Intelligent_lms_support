@@ -1,131 +1,174 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/dashboard-layout'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Bookmark, RotateCcw } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import DashboardLayout from "@/components/dashboard-layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Bookmark, RotateCcw } from "lucide-react";
 
 interface Message {
-  id: string
-  sender: string
-  role: 'student' | 'admin' | 'agent'
-  message: string
-  timestamp: string
-  avatar?: string
+  id: string;
+  ticket_id: string;
+  sender_role: "student" | "admin" | "agent";
+  sender_id?: string;
+  message: string;
+  confidence_score?: number;
+  timestamp: string;
+  sender_email?: string;
 }
 
 interface TicketDetail {
-  id: string
-  title: string
-  status: 'Open' | 'Work in Progress' | 'Action Required' | 'Resolved' | 'Closed'
-  category: string
-  activity: string
-  messages: Message[]
-  rating?: number
+  id: string;
+  user_id: string;
+  category: string;
+  status:
+    | "Open"
+    | "Work in Progress"
+    | "Action Required"
+    | "Resolved"
+    | "Closed";
+  title: string;
+  message: string;
+  subcategory_data?: any;
+  from_date?: string;
+  to_date?: string;
+  attachments: string[];
+  assigned_to?: string;
+  rating?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+interface TicketDetailResponse {
+  ticket: TicketDetail;
+  conversations: Message[];
 }
 
 export default function TicketDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const [ticket, setTicket] = useState<TicketDetail | null>(null)
-  const [selectedRating, setSelectedRating] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const params = useParams();
+  const router = useRouter();
+  const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
+  const [selectedRating, setSelectedRating] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-    const mockTicket: TicketDetail = {
-      id: params.id as string,
-      title: 'Update in Resume',
-      status: 'Resolved',
-      category: 'Mac',
-      activity: 'Resume',
-      messages: [
-        {
-          id: '1',
-          sender: 'Kinjal Monaya',
-          role: 'student',
-          message: "Dear Team,\n\nI've changed my LinkedIn Link and updated a project in my resume. Request you to kindly update it in your record as well.\n\nFollowing is the drive link- https://drive.google.com/file/d/1GTJfwpwazibTeeGnx8D1OoeFZNGBAvew?usp=sharing\n\nThanks and Regards.",
-          timestamp: '7 Sep, 2023 at 6:08 PM (IST)'
-        },
-        {
-          id: '2',
-          sender: 'Anamika Basu',
-          role: 'admin',
-          message: 'We were happy to assist you!\nYour ticket is now marked as resolved. We have sent you the feedback where you can share your the support experience.\nThank you\nStudent Experience Team',
-          timestamp: '7 Sep, 2023 at 6:08 PM (IST)',
-          avatar: 'AB'
-        },
-        {
-          id: '3',
-          sender: 'Anamika Basu',
-          role: 'admin',
-          message: 'Your resume has been updated',
-          timestamp: '8 Sep, 2023 at 5:03 PM (IST)',
-          avatar: 'AB'
+    const fetchTicketDetail = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}`,
+          {
+            credentials: "include",
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-      ],
-      rating: 4
-    }
-    
-    setTicket(mockTicket)
-    setSelectedRating(mockTicket.rating || null)
-    setIsLoading(false)
-  }, [params.id])
+        const data: TicketDetailResponse = await response.json();
+        setTicket(data);
+        setSelectedRating(data.ticket.rating || null);
+      } catch (error) {
+        console.error("Failed to fetch ticket details:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTicketDetail();
+  }, [params.id]);
 
   const handleRating = async (rating: number) => {
-    setSelectedRating(rating)
-    
+    setSelectedRating(rating);
+
     // Mock API call to update rating
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/rate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ rating })
-      })
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/rate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ rating }),
+        }
+      );
     } catch (error) {
-      console.error('Failed to submit rating:', error)
+      console.error("Failed to submit rating:", error);
     }
-  }
+  };
 
   const handleReopenTicket = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/reopen`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/reopen`,
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
+
       // Refresh the page or update state
-      router.refresh()
+      router.refresh();
     } catch (error) {
-      console.error('Failed to reopen ticket:', error)
+      console.error("Failed to reopen ticket:", error);
     }
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Resolved':
-        return 'bg-green-100 text-green-800'
-      case 'Closed':
-        return 'bg-blue-100 text-blue-800'
-      case 'Open':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'Work in Progress':
-        return 'bg-orange-100 text-orange-800'
-      case 'Action Required':
-        return 'bg-red-100 text-red-800'
+      case "Resolved":
+        return "bg-green-100 text-green-800";
+      case "Closed":
+        return "bg-blue-100 text-blue-800";
+      case "Open":
+        return "bg-yellow-100 text-yellow-800";
+      case "Work in Progress":
+        return "bg-orange-100 text-orange-800";
+      case "Action Required":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800'
+        return "bg-gray-100 text-gray-800";
     }
-  }
+  };
 
-  const ratingEmojis = ['😠', '😞', '😐', '😊', '😍']
+  const ratingEmojis = ["😠", "😞", "😐", "😊", "😍"];
+
+const formatTimestamp = (timestamp: string) => {
+  const date = new Date(timestamp);
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+};
+
+  const formatSenderName = (email: string | undefined, role: string) => {
+    if (email) {
+      const name = email.split("@")[0];
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
+  const getMessageBackgroundColor = (role: string) => {
+    switch (role) {
+      case "student":
+        return "bg-blue-50";
+      case "admin":
+        return "bg-green-50";
+      case "agent":
+        return "bg-yellow-50";
+      default:
+        return "bg-gray-50";
+    }
+  };
 
   if (isLoading) {
     return (
@@ -134,7 +177,7 @@ export default function TicketDetailPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       </DashboardLayout>
-    )
+    );
   }
 
   if (!ticket) {
@@ -142,12 +185,16 @@ export default function TicketDetailPage() {
       <DashboardLayout>
         <div className="p-6">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-900">Ticket not found</h2>
-            <p className="text-gray-600 mt-2">The ticket you're looking for doesn't exist.</p>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Ticket not found
+            </h2>
+            <p className="text-gray-600 mt-2">
+              The ticket you're looking for doesn't exist.
+            </p>
           </div>
         </div>
       </DashboardLayout>
-    )
+    );
   }
 
   return (
@@ -157,22 +204,22 @@ export default function TicketDetailPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
             <h1 className="text-2xl font-semibold text-gray-900">
-              {ticket.title}
+              {ticket.ticket.title}
             </h1>
-            <Badge className={getStatusColor(ticket.status)}>
-              {ticket.status.toUpperCase()}
+            <Badge className={getStatusColor(ticket.ticket.status)}>
+              {ticket.ticket.status.toUpperCase()}
             </Badge>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="sm">
               <Bookmark className="h-4 w-4 mr-2" />
               BOOKMARK
             </Button>
-            
-            {ticket.status === 'Resolved' && (
-              <Button 
-                variant="outline" 
+
+            {ticket.ticket.status === "Resolved" && (
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={handleReopenTicket}
                 className="text-blue-600 border-blue-600 hover:bg-blue-50"
@@ -187,34 +234,63 @@ export default function TicketDetailPage() {
         {/* Ticket Info */}
         <div className="mb-6 text-sm text-gray-600">
           <span>Support related to: </span>
-          <span className="font-medium">{ticket.category}</span>
-          <span className="mx-2">•</span>
-          <span>Activity: </span>
-          <span className="font-medium">{ticket.activity}</span>
+          <span className="font-medium">{ticket.ticket.category}</span>
+          {ticket.ticket.subcategory_data?.activity && (
+            <>
+              <span className="mx-2">•</span>
+              <span>Activity: </span>
+              <span className="font-medium">
+                {ticket.ticket.subcategory_data?.activity || "N/A"}
+              </span>
+            </>
+          )}
         </div>
 
         {/* Messages */}
         <div className="space-y-6 mb-8">
-          {ticket.messages.map((message, index) => (
-            <Card key={message.id}>
+          {ticket.conversations.map((message, index) => (
+            <Card
+              key={message.id}
+              className={getMessageBackgroundColor(message.sender_role)}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={message.avatar ? `/placeholder.svg?height=32&width=32` : undefined} />
+                    <AvatarImage
+                      src={
+                        message.sender_email
+                          ? `/placeholder.svg?height=32&width=32`
+                          : undefined
+                      }
+                    />
                     <AvatarFallback className="bg-green-100 text-green-700">
-                      {message.avatar || message.sender.split(' ').map(n => n[0]).join('')}
+                      {message.sender_email
+                        ? message.sender_email
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                        : message.sender_role.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="font-medium text-gray-900">{message.sender}</div>
-                    {index === 1 && (
-                      <Badge className="bg-orange-100 text-orange-800 text-xs mt-1">
-                        TICKET RESOLVED
-                      </Badge>
-                    )}
+                    <div className="font-medium text-gray-900">
+                      {formatSenderName(
+                        message.sender_email,
+                        message.sender_role
+                      )}
+                    </div>
+                    {message.sender_role === "admin" &&
+                      ticket.ticket.status === "Resolved" &&
+                      index === ticket.conversations.length - 1 && (
+                        <Badge className="bg-orange-100 text-orange-800 text-xs mt-1">
+                          TICKET RESOLVED
+                        </Badge>
+                      )}
                   </div>
                   <div className="flex-1"></div>
-                  <div className="text-sm text-gray-500">{message.timestamp}</div>
+                  <div className="text-sm text-gray-500">
+                    {formatTimestamp(message.timestamp)}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
@@ -226,36 +302,78 @@ export default function TicketDetailPage() {
           ))}
         </div>
 
+        <div className="mt-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Send a Message
+          </h3>
+          <textarea
+            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Type your message here..."
+            rows={4}
+          ></textarea>
+          <Button
+            className="mt-3 bg-blue-600 text-white hover:bg-blue-700"
+            onClick={async () => {
+              const message = document.querySelector("textarea")?.value;
+              if (message) {
+                try {
+                  await fetch(
+                    `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/messages`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      credentials: "include",
+                      body: JSON.stringify({ message }),
+                    }
+                  );
+                  router.refresh();
+                } catch (error) {
+                  console.error("Failed to send message:", error);
+                }
+              }
+            }}
+          >
+            Send Message
+          </Button>
+        </div>
+
         {/* Rating Section */}
-        {ticket.status === 'Resolved' && (
+        {ticket.ticket.status === "Resolved" && (
           <Card>
             <CardContent className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Rating & Feedback</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Rating & Feedback
+              </h3>
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-3">How happy are you with the assistance?</p>
+                <p className="text-sm text-gray-600 mb-3">
+                  How happy are you with the assistance?
+                </p>
                 <div className="flex space-x-2">
                   {ratingEmojis.map((emoji, index) => {
-                    const rating = index + 1
+                    const rating = index + 1;
                     return (
                       <button
                         key={rating}
                         onClick={() => handleRating(rating)}
                         className={`text-2xl p-2 rounded-lg transition-all ${
                           selectedRating === rating
-                            ? 'bg-blue-100 scale-110'
-                            : 'hover:bg-gray-100 hover:scale-105'
+                            ? "bg-blue-100 scale-110"
+                            : "hover:bg-gray-100 hover:scale-105"
                         }`}
                       >
                         {emoji}
                       </button>
-                    )
+                    );
                   })}
                 </div>
               </div>
-              
+
               {selectedRating && (
                 <div className="text-sm text-gray-600">
-                  Thank you for your feedback! You rated this resolution {selectedRating} out of 5.
+                  Thank you for your feedback! You rated this resolution{" "}
+                  {selectedRating} out of 5.
                 </div>
               )}
             </CardContent>
@@ -263,5 +381,5 @@ export default function TicketDetailPage() {
         )}
       </div>
     </DashboardLayout>
-  )
+  );
 }

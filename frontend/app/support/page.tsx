@@ -1,121 +1,107 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import DashboardLayout from '@/components/dashboard-layout'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { MessageSquare, Star } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import DashboardLayout from "@/components/dashboard-layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { MessageSquare, Star } from "lucide-react";
 
 interface Ticket {
-  id: string
-  title: string
-  status: 'Open' | 'Work in Progress' | 'Action Required' | 'Resolved' | 'Closed'
-  responseCount: number
-  lastUpdated: string
-  assignedTo: string
-  rating?: number
+  id: string;
+  user_id: string;
+  category: string;
+  status:
+    | "Open"
+    | "Work in Progress"
+    | "Action Required"
+    | "Resolved"
+    | "Closed";
+  title: string;
+  created_at: string;
+  updated_at?: string;
+  rating?: number;
+  assigned_to?: string;
+  assigned_admin_email?: string;
+  response_count: number;
+  last_response?: string;
+  last_response_time?: string;
 }
 
 export default function SupportPage() {
-  const [activeTab, setActiveTab] = useState<'unresolved' | 'resolved'>('unresolved')
-  const [tickets, setTickets] = useState<Ticket[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<"unresolved" | "resolved">(
+    "unresolved"
+  );
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-    const mockTickets: Ticket[] = [
-      {
-        id: 'TKT-001',
-        title: 'Update in Resume',
-        status: 'Resolved',
-        responseCount: 1,
-        lastUpdated: '8 Sep, 2023 at 5:03 PM (IST)',
-        assignedTo: 'Mac',
-        rating: 4
-      },
-      {
-        id: 'TKT-002',
-        title: 'Portfolio Clearance',
-        status: 'Closed',
-        responseCount: 2,
-        lastUpdated: '25 Aug, 2023 at 1:24 PM (IST)',
-        assignedTo: 'Mac'
-      },
-      {
-        id: 'TKT-003',
-        title: 'Updating Final Resume',
-        status: 'Resolved',
-        responseCount: 1,
-        lastUpdated: '17 Jul, 2023 at 9:23 AM (IST)',
-        assignedTo: 'Mac',
-        rating: 5
-      },
-      {
-        id: 'TKT-004',
-        title: 'RM Mock Assessment Result - 02',
-        status: 'Resolved',
-        responseCount: 1,
-        lastUpdated: '8 Jul, 2023 at 1:24 PM (IST)',
-        assignedTo: 'Revision'
-      },
-      {
-        id: 'TKT-005',
-        title: 'Marks Calculation',
-        status: 'Resolved',
-        responseCount: 1,
-        lastUpdated: '3 May, 2023 at 8:14 PM (IST)',
-        assignedTo: 'Evaluation-score'
+    const fetchTickets = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/my_tickets`,
+          {
+            credentials: "include",
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data: Ticket[] = await response.json();
+        setTickets(data);
+      } catch (error) {
+        console.error("Failed to fetch tickets:", error);
+      } finally {
+        setIsLoading(false);
       }
-    ]
-    
-    setTickets(mockTickets)
-    setIsLoading(false)
-  }, [])
+    };
+
+    fetchTickets();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Resolved':
-        return 'bg-green-100 text-green-800'
-      case 'Closed':
-        return 'bg-blue-100 text-blue-800'
-      case 'Open':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'Work in Progress':
-        return 'bg-orange-100 text-orange-800'
-      case 'Action Required':
-        return 'bg-red-100 text-red-800'
+      case "Resolved":
+        return "bg-green-100 text-green-800";
+      case "Closed":
+        return "bg-blue-100 text-blue-800";
+      case "Open":
+        return "bg-yellow-100 text-yellow-800";
+      case "Work in Progress":
+        return "bg-orange-100 text-orange-800";
+      case "Action Required":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800'
+        return "bg-gray-100 text-gray-800";
     }
-  }
+  };
 
-  const filteredTickets = tickets.filter(ticket => {
-    if (activeTab === 'resolved') {
-      return ticket.status === 'Resolved' || ticket.status === 'Closed'
+  const filteredTickets = tickets.filter((ticket) => {
+    if (activeTab === "resolved") {
+      return ticket.status === "Resolved" || ticket.status === "Closed";
     }
-    return ticket.status !== 'Resolved' && ticket.status !== 'Closed'
-  })
+    return ticket.status !== "Resolved" && ticket.status !== "Closed";
+  });
 
   const renderStars = (rating?: number) => {
-    if (!rating) return <span className="text-gray-400">--</span>
-    
+    if (!rating) return <span className="text-gray-400">--</span>;
+
     return (
       <div className="flex items-center space-x-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
             className={`h-4 w-4 ${
-              star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+              star <= rating ? "text-yellow-400 fill-current" : "text-gray-300"
             }`}
           />
         ))}
       </div>
-    )
-  }
+    );
+  };
 
   if (isLoading) {
     return (
@@ -124,14 +110,29 @@ export default function SupportPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       </DashboardLayout>
-    )
+    );
   }
+
+const formatTimestamp = (timestamp: string) => {
+  const date = new Date(timestamp);
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+};
 
   return (
     <DashboardLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Support Tickets</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Support Tickets
+          </h1>
           <Link href="/support/create">
             <Button className="bg-blue-600 hover:bg-blue-700">
               CREATE TICKET
@@ -142,21 +143,21 @@ export default function SupportPage() {
         {/* Tabs */}
         <div className="flex space-x-1 mb-6">
           <button
-            onClick={() => setActiveTab('unresolved')}
+            onClick={() => setActiveTab("unresolved")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'unresolved'
-                ? 'bg-gray-200 text-gray-900'
-                : 'text-gray-600 hover:text-gray-900'
+              activeTab === "unresolved"
+                ? "bg-gray-200 text-gray-900"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             Unresolved
           </button>
           <button
-            onClick={() => setActiveTab('resolved')}
+            onClick={() => setActiveTab("resolved")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'resolved'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:text-gray-900'
+              activeTab === "resolved"
+                ? "bg-blue-100 text-blue-700"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             Resolved
@@ -173,7 +174,7 @@ export default function SupportPage() {
                   No {activeTab} tickets
                 </h3>
                 <p className="text-gray-500">
-                  {activeTab === 'resolved' 
+                  {activeTab === "resolved"
                     ? "You don't have any resolved tickets yet."
                     : "You don't have any unresolved tickets."}
                 </p>
@@ -181,37 +182,47 @@ export default function SupportPage() {
             </Card>
           ) : (
             filteredTickets.map((ticket) => (
-              <Card key={ticket.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={ticket.id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <Link 
+                      <Link
                         href={`/support/ticket/${ticket.id}`}
                         className="text-lg font-medium text-gray-900 hover:text-blue-600 transition-colors"
                       >
                         {ticket.title}
                       </Link>
-                      
+
                       <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                         <div className="flex items-center space-x-1">
                           <MessageSquare className="h-4 w-4" />
-                          <span>{ticket.responseCount} Response</span>
+                          <span>
+                            {ticket.response_count - 1} Response
+                            {ticket.response_count - 1 > 0 ? "s" : ""}
+                          </span>
                         </div>
                         <span>•</span>
-                        <span>{ticket.assignedTo}</span>
+                        <span>{ticket.assigned_to || "Unassigned"}</span>
                         <span>•</span>
-                        <span>Last Updated on {ticket.lastUpdated}</span>
+                        <span>
+                          Last Updated on {formatTimestamp(ticket.updated_at || ticket.created_at)}
+                        </span>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-4">
                       {ticket.rating && (
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">You rated</span>
+                          <span className="text-sm text-gray-500">
+                            You rated
+                          </span>
                           {renderStars(ticket.rating)}
                         </div>
                       )}
-                      
+
                       <Badge className={getStatusColor(ticket.status)}>
                         {ticket.status.toUpperCase()}
                       </Badge>
@@ -224,5 +235,5 @@ export default function SupportPage() {
         </div>
       </div>
     </DashboardLayout>
-  )
+  );
 }

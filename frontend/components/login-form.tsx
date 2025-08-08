@@ -21,7 +21,6 @@ export default function LoginForm() {
     setError('')
 
     try {
-      // Real authentication - call backend API
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/v1/auth/login`, {
         method: 'POST',
         headers: {
@@ -36,7 +35,7 @@ export default function LoginForm() {
         localStorage.setItem('userRole', data.role);
         localStorage.setItem('userEmail', data.email);
         setError('');
-        router.push('/dashboard');
+        router.push('/unavailable?label=Dashboard')
       } else {
         let msg = 'Invalid email or password';
         if (data?.detail) msg = data.detail;

@@ -1,0 +1,33 @@
+2025-08-08 09:49:22,673 - backend.app.db.init_db - INFO - Database already initialized with users
+2025-08-08 09:51:21,871 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "C:\Users\Kinjal\AppData\Local\Programs\Python\Python311\Lib\site-packages\passlib\handlers\bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 10:10:11,703 - backend.app.agents.langgraph_workflow - INFO - Initialized state for ticket 68957fab48a8616e1c060f96
+2025-08-08 10:10:11,877 - grpc._plugin_wrapping - ERROR - AuthMetadataPluginCallback "<google.auth.transport.grpc.AuthMetadataPlugin object at 0x00000195ABF56A90>" raised exception!
+Traceback (most recent call last):
+  File "C:\Users\Kinjal\AppData\Local\Programs\Python\Python311\Lib\site-packages\grpc\_plugin_wrapping.py", line 105, in __call__
+    self._metadata_plugin(
+  File "C:\Users\Kinjal\AppData\Local\Programs\Python\Python311\Lib\site-packages\google\auth\transport\grpc.py", line 95, in __call__
+    callback(self._get_authorization_headers(context), None)
+  File "C:\Users\Kinjal\AppData\Local\Programs\Python\Python311\Lib\site-packages\grpc\_plugin_wrapping.py", line 74, in __call__
+    self._callback(metadata, cygrpc.StatusCode.ok, None)
+  File "src/python/grpcio/grpc/_cython/_cygrpc/credentials.pyx.pxi", line 53, in grpc._cython.cygrpc._get_metadata.callback
+  File "src/python/grpcio/grpc/_cython/_cygrpc/metadata.pyx.pxi", line 43, in grpc._cython.cygrpc._store_c_metadata
+  File "src/python/grpcio/grpc/_cython/_cygrpc/grpc_string.pyx.pxi", line 40, in grpc._cython.cygrpc._encode
+TypeError: Expected str, not <class 'pydantic.v1.types.SecretStr'>
+2025-08-08 10:11:11,724 - backend.app.agents.cache_service - ERROR - Semantic cache search error: Error embedding content: 504 Deadline Exceeded
+2025-08-08 10:11:11,725 - backend.app.agents.langgraph_workflow - INFO - Cache miss for ticket 68957fab48a8616e1c060f96
+2025-08-08 10:11:11,934 - backend.app.agents.langgraph_workflow - ERROR - Routing error: Task <Task pending name='Task-79' coro=<BaseChatModel._agenerate_with_cache() running at C:\Users\Kinjal\AppData\Local\Programs\Python\Python311\Lib\site-packages\langchain_core\language_models\chat_models.py:923> cb=[gather.<locals>._done_callback() at C:\Users\Kinjal\AppData\Local\Programs\Python\Python311\Lib\asyncio\tasks.py:764]> got Future <Task pending name='Task-80' coro=<UnaryUnaryCall._invoke() running at C:\Users\Kinjal\AppData\Local\Programs\Python\Python311\Lib\site-packages\grpc\aio\_call.py:577>> attached to a different loop
+2025-08-08 10:11:12,064 - backend.app.agents.escalation_agent - INFO - NOTIFICATION: Admin ec1@masaischool.com assigned to ticket 68957fab48a8616e1c060f96
+2025-08-08 10:11:12,065 - backend.app.agents.escalation_agent - INFO - Ticket 68957fab48a8616e1c060f96 escalated to admin ec1@masaischool.com
+2025-08-08 10:11:12,099 - backend.app.agents.langgraph_workflow - INFO - Escalated ticket 68957fab48a8616e1c060f96 to human admin
+2025-08-08 10:11:12,138 - backend.app.agents.langgraph_workflow - INFO - 
+            Ticket 68957fab48a8616e1c060f96 processing complete:
+            - Final Status: Action Required
+            - Confidence: 0.00
+            - Steps: initialize -> cache_miss -> escalated_to_human -> finalized_Action Required
+            - Iterations: 0
+            

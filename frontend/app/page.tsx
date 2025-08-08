@@ -16,7 +16,7 @@ export default function HomePage() {
     
     if (token && userRole) {
       setIsAuthenticated(true)
-      router.push('/dashboard')
+      router.push('/unavailable?label=Dashboard')
     } else {
       setIsLoading(false)
     }

@@ -12,8 +12,8 @@ class TicketCreateRequest(BaseModel):
     attachments: Optional[List[str]] = None
 
 class TicketResponse(BaseModel):
-    id: int
-    user_id: int
+    id: str
+    user_id: str
     category: str
     status: str
     title: str
@@ -22,7 +22,7 @@ class TicketResponse(BaseModel):
     from_date: Optional[str]
     to_date: Optional[str]
     attachments: Optional[List[str]]
-    assigned_to: Optional[int]
+    assigned_to: Optional[str]
     rating: Optional[float]
     created_at: datetime
     updated_at: Optional[datetime]
@@ -31,15 +31,15 @@ class TicketResponse(BaseModel):
         from_attributes = True
 
 class TicketListResponse(BaseModel):
-    id: int
-    user_id: int
+    id: str
+    user_id: str
     category: str
     status: str
     title: str
     created_at: datetime
     updated_at: Optional[datetime]
     rating: Optional[float]
-    assigned_to: Optional[int]
+    assigned_to: Optional[str]
     assigned_admin_email: Optional[str] = None  # Will be populated from join
     response_count: int = 0  # Count of conversations
     last_response: Optional[str] = None  # Last conversation message
@@ -49,10 +49,10 @@ class TicketListResponse(BaseModel):
         from_attributes = True
 
 class ConversationResponse(BaseModel):
-    id: int
-    ticket_id: int
+    id: str
+    ticket_id: str
     sender_role: str
-    sender_id: Optional[int]
+    sender_id: Optional[str]
     message: str
     confidence_score: Optional[float]
     timestamp: datetime

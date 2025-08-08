@@ -29,17 +29,7 @@ class EscalationAgent:
                     TicketStatus.ACTION_REQUIRED.value, 
                     admin["id"]
                 )
-                
-                # Add escalation conversation entry
-                escalation_message = await self._create_escalation_message(state)
-                
-                conversation_service.create_conversation(
-                    ticket_id=ticket_id,
-                    sender_role="agent",
-                    message=escalation_message,
-                    confidence_score=state.get("confidence_score")
-                )
-                
+
                 # TODO: Send notification to admin (implement notification system)
                 await self._notify_admin(admin, ticket, state)
                 
@@ -78,36 +68,6 @@ class EscalationAgent:
         except Exception as e:
             logger.error(f"Error finding admin: {str(e)}")
             return None
-    
-    async def _create_escalation_message(self, state: AgentState) -> str:
-        """Create message for admin notification"""
-        try:
-            escalation_parts = [
-                f"ESCALATED TICKET - {state.get('admin_type', 'EC')} Required",
-                f"Category: {state['category']}",
-                f"Original Query: {state['query']}"
-            ]
-            
-            if state.get("missing_information"):
-                escalation_parts.append(f"Missing Information: {', '.join(state['missing_information'])}")
-            
-            if state.get("response") and state.get("confidence_score", 0) >= 0.5:
-                escalation_parts.extend([
-                    "",
-                    f"Suggested Response (Confidence: {state['confidence_score']:.2f}):",
-                    state["response"],
-                    "",
-                    "Please review and modify this response as needed, or provide your own response."
-                ])
-            
-            if state.get("error_message"):
-                escalation_parts.append(f"System Error: {state['error_message']}")
-            
-            return "\n".join(escalation_parts)
-            
-        except Exception as e:
-            logger.error(f"Error creating escalation message: {str(e)}")
-            return f"Ticket escalated due to: {state.get('error_message', 'Unknown issue')}"
     
     async def _create_student_message(self, state: AgentState) -> str:
         """Create generic message for student"""

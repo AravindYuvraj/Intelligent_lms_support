@@ -5,6 +5,7 @@ from bson import ObjectId
 from pymongo import MongoClient
 from backend.app.db.base import get_mongodb
 import logging
+from zoneinfo import ZoneInfo 
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class UserService(MongoBaseService):
             "email": email,
             "password_hash": password_hash,
             "role": role,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
         
         result = self.collection.insert_one(user_doc)
@@ -108,8 +109,8 @@ class TicketService(MongoBaseService):
             "attachments": attachments or [],
             "assigned_to": None,
             "rating": None,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(ZoneInfo("Asia/Kolkata")),
+            "updated_at": datetime.now(ZoneInfo("Asia/Kolkata")),
         }
         
         result = self.collection.insert_one(ticket_doc)
@@ -151,7 +152,7 @@ class TicketService(MongoBaseService):
     def update_ticket(self, ticket_id: str, update_data: Dict[str, Any]) -> bool:
         """Update ticket"""
         try:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(ZoneInfo("Asia/Kolkata"))
             result = self.collection.update_one(
                 {"_id": ObjectId(ticket_id)}, 
                 {"$set": update_data}
@@ -185,7 +186,7 @@ class ConversationService(MongoBaseService):
             "sender_id": sender_id,
             "message": message,
             "confidence_score": confidence_score,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
         
         result = self.collection.insert_one(conversation_doc)
