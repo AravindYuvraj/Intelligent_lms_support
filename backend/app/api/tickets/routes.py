@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from backend.app.models import user_service, ticket_service, conversation_service, TicketStatus
 from backend.app.core.deps import get_current_user, get_current_student, get_current_admin
 from .schemas import (
-    TicketCreateRequest, TicketResponse, TicketListResponse, 
+    TicketCreateRequest, TicketMessageRequest, TicketResponse, TicketListResponse, 
     TicketDetailResponse, ConversationResponse, TicketRatingRequest,
     TicketReopenResponse
 )
@@ -44,6 +44,72 @@ async def create_ticket(
         "message": "Ticket submitted successfully",
         "ticket_id": f"TKT-{ticket_id}"
     }
+
+@router.post("/{ticket_id}/messages", response_model=ConversationResponse)
+async def add_message_to_ticket(
+    ticket_id: str,
+    message_data: TicketMessageRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    ticket = ticket_service.get_ticket_by_id(ticket_id)
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+
+    # Check if the user is authorized to add messages to this ticket
+    # Students can only add messages to their own tickets
+    # Admins can add messages to any assigned or unassigned ticket
+    if current_user["role"] == "student" and ticket["user_id"] != current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to add messages to this ticket"
+        )
+    
+    # If admin, check if assigned or unassigned
+    if current_user["role"] == "admin" and \
+       ticket.get("assigned_to") is not None and \
+       ticket.get("assigned_to") != current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to add messages to this ticket"
+        )
+
+    # Create conversation entry
+    conv_id = conversation_service.create_conversation(
+        ticket_id=ticket_id,
+        sender_role=current_user["role"],
+        sender_id=current_user["id"],
+        message=message_data.message,
+        attachments=message_data.attachments or []
+    )
+
+    # Update ticket's updated_at timestamp
+    ticket_service.update_ticket_timestamp(ticket_id)
+
+    # Process ticket through LangGraph workflow in background
+    background_tasks.add_task(process_ticket_sync, ticket_id)
+
+    # Fetch the newly created conversation to return
+    new_conv = conversation_service.get_conversation_by_id(conv_id)
+    sender_email = None
+    if new_conv.get("sender_id"):
+        sender = user_service.get_user_by_id(new_conv["sender_id"])
+        if sender:
+            sender_email = sender["email"]
+
+    return ConversationResponse(
+        id=new_conv["id"],
+        ticket_id=new_conv["ticket_id"],
+        sender_role=new_conv["sender_role"],
+        sender_id=new_conv.get("sender_id"),
+        message=new_conv["message"],
+        confidence_score=new_conv.get("confidence_score"),
+        timestamp=new_conv["timestamp"],
+        sender_email=sender_email
+    )
 
 @router.get("/my_tickets", response_model=List[TicketListResponse])
 async def get_my_tickets(

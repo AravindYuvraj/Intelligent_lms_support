@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 from bson import ObjectId
@@ -125,6 +125,17 @@ class TicketService(MongoBaseService):
             return ticket
         except:
             return None
+
+    def update_ticket_timestamp(self, ticket_id: str):
+        """Update the updated_at timestamp of a ticket"""
+        self.update_ticket(ticket_id, {"updated_at": datetime.now(ZoneInfo("Asia/Kolkata"))})
+        try:
+            ticket = self.collection.find_one({"_id": ObjectId(ticket_id)})
+            if ticket:
+                ticket["id"] = str(ticket["_id"])
+            return ticket
+        except:
+            return None
     
     def get_user_tickets(self, user_id: str, role:str) -> List[Dict[str, Any]]:
         """Get all tickets for a user"""
@@ -179,7 +190,7 @@ class ConversationService(MongoBaseService):
         self.collection = self.db.conversations
     
     def create_conversation(self, ticket_id: str, sender_role: str, message: str,
-                          sender_id: Optional[str] = None, confidence_score: Optional[float] = None) -> str:
+                          sender_id: Optional[str] = None, confidence_score: Optional[float] = None, attachments: Optional[List[str]] = None) -> str:
         """Create a new conversation entry"""
         conversation_doc = {
             "ticket_id": ticket_id,
@@ -187,11 +198,24 @@ class ConversationService(MongoBaseService):
             "sender_id": sender_id,
             "message": message,
             "confidence_score": confidence_score,
+            "attachments": attachments,
             "timestamp": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
         
         result = self.collection.insert_one(conversation_doc)
         return str(result.inserted_id)
+
+    def get_conversation_by_id(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Get conversation by ID"""
+        try:
+            conversation = self.collection.find_one({"_id": ObjectId(conversation_id)})
+            if conversation:
+                conversation["id"] = str(conversation["_id"])
+                return conversation
+            return None
+        except Exception as e:
+            logger.error(f"Error getting conversation by ID {conversation_id}: {e}")
+            return None
     
     def get_ticket_conversations(self, ticket_id: str) -> List[Dict[str, Any]]:
         """Get all conversations for a ticket"""
