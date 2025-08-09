@@ -1,10 +1,11 @@
-from typing import Dict, Any, List, Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 from bson import ObjectId
 from pymongo import MongoClient
 from backend.app.db.base import get_mongodb
 import logging
+from zoneinfo import ZoneInfo 
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,8 @@ class UserRole(Enum):
 class TicketStatus(Enum):
     OPEN = "Open"
     WIP = "Work in Progress"
-    ACTION_REQUIRED = "Action Required"
+    STUDENT_ACTION_REQUIRED = "Student Action Required"
+    ADMIN_ACTION_REQUIRED = "Admin Action Required"
     RESOLVED = "Resolved"
 
 class TicketCategory(Enum):
@@ -49,14 +51,16 @@ class UserService(MongoBaseService):
         super().__init__()
         self.collection = self.db.users
     
-    def create_user(self, email: str, password_hash: str, role: str) -> str:
+    def create_user(self, email: str, password_hash: str, role: str, user_type: Optional[str] = None) -> str:
         """Create a new user"""
         user_doc = {
             "email": email,
             "password_hash": password_hash,
             "role": role,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
+        if user_type:
+            user_doc["type"] = user_type
         
         result = self.collection.insert_one(user_doc)
         return str(result.inserted_id)
@@ -78,9 +82,12 @@ class UserService(MongoBaseService):
         except:
             return None
     
-    def get_admins(self) -> List[Dict[str, Any]]:
-        """Get all admin users"""
-        users = list(self.collection.find({"role": UserRole.ADMIN.value}))
+    def get_admins(self, admin_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all admin users, optionally filtered by type"""
+        query = {"role": UserRole.ADMIN.value}
+        if admin_type:
+            query["type"] = admin_type
+        users = list(self.collection.find(query))
         for user in users:
             user["id"] = str(user["_id"])
         return users
@@ -95,6 +102,7 @@ class TicketService(MongoBaseService):
                      from_date: Optional[str] = None, to_date: Optional[str] = None,
                      attachments: Optional[List[str]] = None) -> str:
         """Create a new ticket"""
+        print('Received Create request',title, message)
         ticket_doc = {
             "user_id": user_id,
             "category": category,
@@ -107,8 +115,8 @@ class TicketService(MongoBaseService):
             "attachments": attachments or [],
             "assigned_to": None,
             "rating": None,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(ZoneInfo("Asia/Kolkata")),
+            "updated_at": datetime.now(ZoneInfo("Asia/Kolkata")),
         }
         
         result = self.collection.insert_one(ticket_doc)
@@ -123,24 +131,38 @@ class TicketService(MongoBaseService):
             return ticket
         except:
             return None
+
+    def update_ticket_timestamp(self, ticket_id: str):
+        """Update the updated_at timestamp of a ticket"""
+        self.update_ticket(ticket_id, {"updated_at": datetime.now(ZoneInfo("Asia/Kolkata"))})
+        try:
+            ticket = self.collection.find_one({"_id": ObjectId(ticket_id)})
+            if ticket:
+                ticket["id"] = str(ticket["_id"])
+            return ticket
+        except:
+            return None
     
-    def get_user_tickets(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_tickets(self, user_id: str, role:str) -> List[Dict[str, Any]]:
         """Get all tickets for a user"""
-        tickets = list(self.collection.find({"user_id": user_id}).sort("created_at", -1))
+        query = {"assigned_to": user_id} if role == "admin" else {"user_id": user_id}
+        tickets = list(self.collection.find(query).sort("created_at", -1))        
         for ticket in tickets:
             ticket["id"] = str(ticket["_id"])
         return tickets
     
-    def get_admin_tickets(self, admin_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_admin_tickets(self, admin_id: Optional[str] = None, admin_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get tickets for admin (assigned or unassigned)"""
         if admin_id:
             query = {"$or": [
                 {"assigned_to": admin_id},
                 {"assigned_to": None},
-                {"status": TicketStatus.ACTION_REQUIRED.value}
             ]}
         else:
-            query = {"status": TicketStatus.ACTION_REQUIRED.value}
+            query = {"status": TicketStatus.ADMIN_ACTION_REQUIRED.value}
+
+        if admin_type:
+            query["assigned_to_type"] = admin_type
         
         tickets = list(self.collection.find(query).sort("created_at", -1))
         for ticket in tickets:
@@ -150,7 +172,7 @@ class TicketService(MongoBaseService):
     def update_ticket(self, ticket_id: str, update_data: Dict[str, Any]) -> bool:
         """Update ticket"""
         try:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(ZoneInfo("Asia/Kolkata"))
             result = self.collection.update_one(
                 {"_id": ObjectId(ticket_id)}, 
                 {"$set": update_data}
@@ -176,7 +198,7 @@ class ConversationService(MongoBaseService):
         self.collection = self.db.conversations
     
     def create_conversation(self, ticket_id: str, sender_role: str, message: str,
-                          sender_id: Optional[str] = None, confidence_score: Optional[float] = None) -> str:
+                          sender_id: Optional[str] = None, confidence_score: Optional[float] = None, attachments: Optional[List[str]] = None) -> str:
         """Create a new conversation entry"""
         conversation_doc = {
             "ticket_id": ticket_id,
@@ -184,11 +206,24 @@ class ConversationService(MongoBaseService):
             "sender_id": sender_id,
             "message": message,
             "confidence_score": confidence_score,
-            "timestamp": datetime.utcnow()
+            "attachments": attachments,
+            "timestamp": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
         
         result = self.collection.insert_one(conversation_doc)
         return str(result.inserted_id)
+
+    def get_conversation_by_id(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Get conversation by ID"""
+        try:
+            conversation = self.collection.find_one({"_id": ObjectId(conversation_id)})
+            if conversation:
+                conversation["id"] = str(conversation["_id"])
+                return conversation
+            return None
+        except Exception as e:
+            logger.error(f"Error getting conversation by ID {conversation_id}: {e}")
+            return None
     
     def get_ticket_conversations(self, ticket_id: str) -> List[Dict[str, Any]]:
         """Get all conversations for a ticket"""

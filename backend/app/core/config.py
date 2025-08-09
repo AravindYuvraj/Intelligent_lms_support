@@ -1,33 +1,55 @@
 import os
+import json
+from typing import Dict, Optional
+from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
+# Although Pydantic's BaseSettings can load from .env automatically,
+# calling load_dotenv() ensures it works consistently across all environments.
 load_dotenv()
 
-class Settings:
-    # Database
-    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017/lms_support")
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+class Settings(BaseSettings):
+    """
+    Application settings loaded from environment variables using Pydantic.
+    This provides type validation and automatic parsing for complex data types.
+    """
+    # --- Database Configuration ---
+    MONGODB_URL: str
+    REDIS_URL: str
     
-    # Google AI
-    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+    # --- Google AI Configuration ---
+    GOOGLE_API_KEY: str
     
-    # Pinecone
-    PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
-    PINECONE_ENVIRONMENT: str = os.getenv("PINECONE_ENVIRONMENT", "")
-    PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "lms-support-index")
+    # --- Pinecone Configuration ---
+    PINECONE_API_KEY: str
+    PINECONE_ENVIRONMENT: str
     
-    # Cloudinary
-    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")
-    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
-    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
+    # --- Multi-Index and Collection Mapping ---
+    # Pydantic automatically parses the JSON strings from the .env file
+    # into Python dictionaries because of the Dict[str, str] type hint.
+    PINECONE_INDEX_MAP: Dict[str, str]
+    MONGO_COLLECTION_MAP: Dict[str, str]
     
-    # LangSmith
-    LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "true")
-    LANGCHAIN_API_KEY: str = os.getenv("LANGCHAIN_API_KEY", "")
+    # --- LangSmith Configuration (Optional) ---
+    LANGCHAIN_TRACING_V2: Optional[bool] = True
+    LANGCHAIN_API_KEY: Optional[str] = None
     
-    # Application
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
-    SESSION_SECRET_KEY: str = os.getenv("SESSION_SECRET_KEY", "your-secret-key-change-in-production")
+    # --- Application Configuration ---
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
+    SESSION_SECRET_KEY: str
 
+    class Config:
+        # Specifies the .env file to load variables from.
+        env_file = ".env"
+        env_file_encoding = 'utf-8'
+
+# Create a single, globally accessible instance of the settings.
 settings = Settings()
+
+# Example of how to access the settings from other parts of your app:
+# from backend.app.core.config import settings
+#
+# print("Pinecone Index Map:", settings.PINECONE_INDEX_MAP)
+# print("Mongo Collection Map:", settings.MONGO_COLLECTION_MAP)
+# print("Google API Key:", settings.GOOGLE_API_KEY)

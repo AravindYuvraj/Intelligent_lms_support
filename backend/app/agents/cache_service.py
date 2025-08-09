@@ -1,37 +1,63 @@
 import json
 import numpy as np
 from typing import Dict, Any, Optional, List
+from datetime import datetime
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from backend.app.db.base import get_redis
 from backend.app.core.config import settings
 import logging
+from zoneinfo import ZoneInfo 
+import time
+from langchain_huggingface import HuggingFaceEmbeddings
 
 logger = logging.getLogger(__name__)
 
 class SemanticCacheService:
     def __init__(self):
         self.redis_client = get_redis()
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",
-            google_api_key=settings.GOOGLE_API_KEY
+        self.embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-mpnet-base-v2", 
+        model_kwargs={"device": "cpu"}, 
+        encode_kwargs={"normalize_embeddings": True}
         )
     
     async def search_similar(self, query: str, threshold: float = 0.85) -> Optional[Dict[str, Any]]:
         """Search for semantically similar queries in cache"""
         try:
-            # Generate embedding for the query
-            query_embedding = await self.embeddings.aembed_query(query)
-            query_vector = np.array(query_embedding)
+            print(f"CACHE SEARCH: query='{query[:50]}...', threshold={threshold}")
+            
+            retries = 3
+            backoff_time = 1
+            for i in range(retries):
+                try:
+                    query_embedding = await self.embeddings.aembed_query(query)
+                    query_vector = np.array(query_embedding)
+                    break
+                except Exception as e:
+                    if "504" in str(e) and i < retries - 1:
+                        print(f"Embedding failed: {e}. Retrying in {backoff_time} seconds...")
+                        time.sleep(backoff_time)
+                        backoff_time *= 2  # Exponential backoff
+                    else:
+                        print(f"Embedding failed after {i + 1} attempts: {e}")
+                        raise # Re-raise the exception if all retries fail
+            
+            print(f"Generated embedding vector of length: {len(query_vector)}")
             
             # Get all cached queries
             cached_keys = self.redis_client.keys("cache:*")
+            print(f"Found {len(cached_keys)} cached entries to check")
             
             best_match = None
             best_similarity = 0.0
             
             for key in cached_keys:
                 try:
-                    cached_data = json.loads(self.redis_client.get(key))
+                    cached_data_str = self.redis_client.get(key)
+                    if not cached_data_str:
+                        continue
+                        
+                    cached_data = json.loads(cached_data_str)
                     cached_embedding = np.array(cached_data["embedding"])
                     
                     # Calculate cosine similarity
@@ -39,27 +65,32 @@ class SemanticCacheService:
                         np.linalg.norm(query_vector) * np.linalg.norm(cached_embedding)
                     )
                     
+                    print(f"Similarity with cached query '{cached_data.get('query', '')[:30]}...': {similarity:.3f}")
+                    
                     if similarity > best_similarity and similarity >= threshold:
                         best_similarity = similarity
                         best_match = cached_data
+                        print(f"New best match found with similarity: {similarity:.3f}")
                         
                 except Exception as e:
-                    logger.error(f"Error processing cached item {key}: {str(e)}")
+                    print(f"Error processing cached item {key}: {str(e)}")
                     continue
             
             if best_match:
-                logger.info(f"Found cached response with similarity: {best_similarity}")
+                print(f"CACHE HIT: Found cached response with similarity: {best_similarity:.3f}")
                 return {
                     "response": best_match["response"],
                     "confidence": best_match.get("confidence", 0.9),
                     "similarity": best_similarity,
                     "original_query": best_match["query"]
                 }
+            else:
+                print(f"CACHE MISS: No similar queries found above threshold {threshold}")
             
             return None
             
         except Exception as e:
-            logger.error(f"Semantic cache search error: {str(e)}")
+            print(f"Semantic cache search error", e)
             return None
     
     async def store_response(
@@ -72,6 +103,8 @@ class SemanticCacheService:
     ):
         """Store a query-response pair in semantic cache"""
         try:
+            print(f"STORING IN CACHE: query='{query[:50]}...', confidence={confidence}")
+            
             # Generate embedding for the query
             query_embedding = await self.embeddings.aembed_query(query)
             
@@ -83,7 +116,7 @@ class SemanticCacheService:
                 "category": category,
                 "embedding": query_embedding,
                 "metadata": metadata or {},
-                "timestamp": int(np.datetime64('now').astype(np.int64) / 1e9)
+                "timestamp": datetime.now(ZoneInfo("Asia/Kolkata")).timestamp()
             }
             
             # Store in Redis with expiration (7 days)
@@ -91,30 +124,39 @@ class SemanticCacheService:
             self.redis_client.setex(
                 cache_key,
                 604800,  # 7 days in seconds
-                json.dumps(cache_data)
+                json.dumps(cache_data, default=str)
             )
             
-            logger.info(f"Stored response in cache for query: {query[:50]}...")
+            print(f"CACHED SUCCESSFULLY: key={cache_key}")
             
         except Exception as e:
-            logger.error(f"Error storing in cache: {str(e)}")
+            print(f"Error storing in cache")
     
     async def invalidate_category(self, category: str):
         """Invalidate cache entries for a specific category (useful when knowledge base is updated)"""
         try:
+            print(f" INVALIDATING CACHE for category: {category}")
             cached_keys = self.redis_client.keys("cache:*")
+            invalidated_count = 0
             
             for key in cached_keys:
                 try:
-                    cached_data = json.loads(self.redis_client.get(key))
+                    cached_data_str = self.redis_client.get(key)
+                    if not cached_data_str:
+                        continue
+                        
+                    cached_data = json.loads(cached_data_str)
                     if cached_data.get("category") == category:
                         self.redis_client.delete(key)
-                        logger.info(f"Invalidated cache entry for category {category}")
+                        invalidated_count += 1
+                        
                 except Exception as e:
-                    logger.error(f"Error invalidating cache item {key}: {str(e)}")
+                    print(f"Error invalidating cache item {key}: {str(e)}")
+            
+            print(f"INVALIDATED {invalidated_count} cache entries for category {category}")
                     
         except Exception as e:
-            logger.error(f"Error invalidating category cache: {str(e)}")
+            print(f"Error invalidating category cache: {str(e)}")
     
     def clear_all(self):
         """Clear all cache entries"""
@@ -122,6 +164,47 @@ class SemanticCacheService:
             cached_keys = self.redis_client.keys("cache:*")
             if cached_keys:
                 self.redis_client.delete(*cached_keys)
-                logger.info(f"Cleared {len(cached_keys)} cache entries")
+                print(f"CLEARED {len(cached_keys)} cache entries")
+            else:
+                print("No cache entries to clear")
         except Exception as e:
-            logger.error(f"Error clearing cache: {str(e)}")
+            print(f"Error clearing cache: {str(e)}")
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics for monitoring"""
+        try:
+            cached_keys = self.redis_client.keys("cache:*")
+            stats = {
+                "total_entries": len(cached_keys),
+                "categories": {},
+                "oldest_entry": None,
+                "newest_entry": None
+            }
+            
+            timestamps = []
+            for key in cached_keys:
+                try:
+                    cached_data_str = self.redis_client.get(key)
+                    if not cached_data_str:
+                        continue
+                    
+                    cached_data = json.loads(cached_data_str)
+                    category = cached_data.get("category", "unknown")
+                    timestamp = cached_data.get("timestamp", 0)
+                    
+                    stats["categories"][category] = stats["categories"].get(category, 0) + 1
+                    timestamps.append(timestamp)
+                    
+                except Exception as e:
+                    print(f"ror processing cache stats for {key}: {e}")
+                    continue
+            
+            if timestamps:
+                stats["oldest_entry"] = min(timestamps)
+                stats["newest_entry"] = max(timestamps)
+            
+            return stats
+            
+        except Exception as e:
+            print(f"ror getting cache stats: {e}")
+            return {"error": str(e)}

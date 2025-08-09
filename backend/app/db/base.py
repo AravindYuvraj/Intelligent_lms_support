@@ -4,7 +4,7 @@ from backend.app.core.config import settings
 
 # MongoDB Database
 mongodb_client = MongoClient(settings.MONGODB_URL)
-mongodb_db = mongodb_client.get_database()
+mongodb_db = mongodb_client["lms_support"]
 
 # Redis Client
 redis_client = redis.from_url(settings.REDIS_URL)
