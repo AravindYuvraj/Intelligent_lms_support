@@ -5,44 +5,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { getStatusColor } from "@/utils";
+import { getMessageBackgroundColor, Message, TicketDetail } from "@/types";
+import { formatTimestamp, getStatusColor } from "@/utils";
 import { Bookmark, RotateCcw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-interface Message {
-  id: string;
-  ticket_id: string;
-  sender_role: "student" | "admin" | "agent";
-  sender_id?: string;
-  message: string;
-  confidence_score?: number;
-  timestamp: string;
-  sender_email?: string;
-}
-
-interface TicketDetail {
-  id: string;
-  user_id: string;
-  category: string;
-  status:
-    | "Open"
-    | "Work in Progress"
-    | "Student Action Required"
-    | "Admin Action Required"
-    | "Resolved"
-    | "Closed";
-  title: string;
-  message: string;
-  subcategory_data?: any;
-  from_date?: string;
-  to_date?: string;
-  attachments: string[];
-  assigned_to?: string;
-  rating?: number;
-  created_at: string;
-  updated_at?: string;
-}
 
 interface TicketDetailResponse {
   ticket: TicketDetail;
@@ -121,38 +88,12 @@ export default function TicketDetailPage() {
 
   const ratingEmojis = ["😠", "😞", "😐", "😊", "😍"];
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
-    return new Intl.DateTimeFormat("en-IN", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(date);
-  };
-
   const formatSenderName = (email: string | undefined, role: string) => {
     if (email) {
       const name = email.split("@")[0];
       return name.charAt(0).toUpperCase() + name.slice(1);
     }
     return role.charAt(0).toUpperCase() + role.slice(1);
-  };
-
-  const getMessageBackgroundColor = (role: string) => {
-    switch (role) {
-      case "student":
-        return "bg-blue-50";
-      case "admin":
-        return "bg-green-50";
-      case "agent":
-        return "bg-yellow-50";
-      default:
-        return "bg-gray-50";
-    }
   };
 
   if (isLoading) {

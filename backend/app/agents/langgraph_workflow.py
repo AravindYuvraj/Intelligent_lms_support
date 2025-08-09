@@ -21,6 +21,7 @@ from .escalation_agent import EscalationAgent
 import traceback
 import re
 from typing_extensions import Literal, Annotated
+from utils import get_kb_category, find_available_admin
 
 logger = logging.getLogger(__name__)
 
@@ -79,71 +80,6 @@ class EnhancedLangGraphWorkflow:
         self.escalation_agent = EscalationAgent()
         self.workflow = self._build_workflow()
         
-    async def _find_available_admin(self, admin_type: str) -> Dict[str, Any]:
-        """
-        Finds an available admin.
-        In a real system, this would check for load, online status, and specialty.
-        For now, it returns the first available admin.
-        """
-        try:
-            # This logic can be expanded to filter by EC/IA roles if they are stored in the user model
-            admins = user_service.get_admins(admin_type=admin_type)
-            print(f"available admins {admins}.")
-            return admins[0] if admins else None
-        except Exception as e:
-            logger.error(f"Error finding admin: {e}")
-            return None
-        
-    def _get_kb_category(self, ticket_category: Optional[str]) -> Optional[str]:
-        """
-        Maps an incoming ticket category to one of the three main knowledge base categories.
-        
-        Returns the name of the knowledge base category (e.g., "program_details_documents").
-        """
-        if not ticket_category:
-            print("No category provided, defaulting to qa_documents")
-            return "qa_documents"
-
-        # Enhanced mapping with more detailed logging
-        category_mapping = {
-            # Program and administrative related -> Program Details
-            "Course Query": "program_details_documents",
-            "Attendance/Counselling Support": "program_details_documents", 
-            "Leave": "program_details_documents",
-            "Late Evaluation Submission": "program_details_documents",
-            "Missed Evaluation Submission": "program_details_documents",
-            "Withdrawal": "program_details_documents",
-            
-            # Technical and curriculum related -> Curriculum Documents
-            "Evaluation Score": "curriculum_documents",
-            "MAC": "curriculum_documents",
-            "Revision": "curriculum_documents",
-            
-            # General support, FAQs, troubleshooting -> qa_documents
-            "Product Support": "qa_documents",
-            "NBFC/ISA": "qa_documents",
-            "Feedback": "qa_documents",
-            "Referral": "qa_documents",
-            "Personal Query": "qa_documents",
-            "Code Review": "qa_documents",
-            "Placement Support - Placements": "qa_documents",
-            "Offer Stage- Placements": "qa_documents", 
-            "ISA/EMI/NBFC/Glide Related - Placements": "qa_documents",
-            "Session Support - Placement": "qa_documents",
-            "IA Support": "qa_documents",
-        }
-        
-        mapped_category = category_mapping.get(ticket_category)
-        
-        if mapped_category:
-            print(f"CATEGORY MAPPING: '{ticket_category}' -> '{mapped_category}'")
-        else:
-            print(f" UNMAPPED CATEGORY: '{ticket_category}', defaulting to 'qa_documents'")
-            mapped_category = "qa_documents"
-        
-        return mapped_category
-
-
     def _build_workflow(self) -> StateGraph:
         """Builds the simplified, more powerful LangGraph workflow."""
         print("Building LangGraph workflow...")
@@ -238,7 +174,7 @@ class EnhancedLangGraphWorkflow:
         category = state["category"]
         original_query = state["original_query"]
 
-        kb_category = self._get_kb_category(category)
+        kb_category = get_kb_category(category)
 
         # Only rewrite for the specified categories
         if kb_category not in ["curriculum_documents", "program_details_documents"]:
@@ -452,7 +388,7 @@ Make your decision.
                 message = decision.get('response', "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info']))
                 conversation_service.create_conversation(ticket_id, "agent", message, confidence_score=confidence)
                 
-                admin = await self._find_available_admin(decision.get("admin_type", "EC"))
+                admin = await find_available_admin(decision.get("admin_type", "EC"))
                 print(f"admin in request info {admin}.")
                 admin_id = admin["id"] if admin else None
                 print(f"assigning admin in request info {admin_id}.")

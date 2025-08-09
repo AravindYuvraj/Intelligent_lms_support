@@ -2,12 +2,13 @@
 backend/app/agents/retriever_agent.py
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import logging
 
 # Local application imports
 from backend.app.services.document_service import DocumentService
 from .state import AgentState, WorkflowStep
+from utils import get_kb_category
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ class RetrieverAgent:
                 raise Exception("DocumentService not initialized")
             
             # 1. Map the incoming ticket category...
-            kb_category = self._get_kb_category(category)
+            kb_category = get_kb_category(category)
             
             if not kb_category:
                 print(f"No knowledge base mapping for category: {category}. Skipping retrieval.")
@@ -136,55 +137,6 @@ class RetrieverAgent:
             state["requires_escalation"] = True
             state["current_step"] = WorkflowStep.ESCALATION.value
             return state
-
-    def _get_kb_category(self, ticket_category: Optional[str]) -> Optional[str]:
-        """
-        Maps an incoming ticket category to one of the three main knowledge base categories.
-        
-        Returns the name of the knowledge base category (e.g., "program_details_documents").
-        """
-        if not ticket_category:
-            print("No category provided, defaulting to qa_documents")
-            return "qa_documents"
-
-        # Enhanced mapping with more detailed logging
-        category_mapping = {
-            # Program and administrative related -> Program Details
-            "Course Query": "program_details_documents",
-            "Attendance/Counselling Support": "program_details_documents", 
-            "Leave": "program_details_documents",
-            "Late Evaluation Submission": "program_details_documents",
-            "Missed Evaluation Submission": "program_details_documents",
-            "Withdrawal": "program_details_documents",
-            
-            # Technical and curriculum related -> Curriculum Documents
-            "Evaluation Score": "curriculum_documents",
-            "MAC": "curriculum_documents",
-            "Revision": "curriculum_documents",
-            
-            # General support, FAQs, troubleshooting -> qa_documents
-            "Product Support": "qa_documents",
-            "NBFC/ISA": "qa_documents",
-            "Feedback": "qa_documents",
-            "Referral": "qa_documents",
-            "Personal Query": "qa_documents",
-            "Code Review": "qa_documents",
-            "Placement Support - Placements": "qa_documents",
-            "Offer Stage- Placements": "qa_documents", 
-            "ISA/EMI/NBFC/Glide Related - Placements": "qa_documents",
-            "Session Support - Placement": "qa_documents",
-            "IA Support": "qa_documents",
-        }
-        
-        mapped_category = category_mapping.get(ticket_category)
-        
-        if mapped_category:
-            print(f"CATEGORY MAPPING: '{ticket_category}' -> '{mapped_category}'")
-        else:
-            print(f" UNMAPPED CATEGORY: '{ticket_category}', defaulting to 'qa_documents'")
-            mapped_category = "qa_documents"
-        
-        return mapped_category
 
     async def _rerank_chunks(self, chunks: List[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
         """
