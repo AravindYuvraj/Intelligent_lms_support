@@ -11,7 +11,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate,MessagesPlaceholder
 from pydantic import BaseModel, Field
 from backend.app.models import ticket_service, conversation_service, user_service, TicketStatus
 from backend.app.core.config import settings
@@ -111,19 +111,20 @@ class EnhancedLangGraphWorkflow:
 
             conversations = conversation_service.get_ticket_conversations(state["ticket_id"])
             
-            # Create a user-friendly conversation history
-            history = []
+            messages = []
             for conv in conversations:
-                role = "Student" if conv["sender_role"] == "student" else "Support"
-                history.append(f"{role}: {conv['message']}")
+                if conv["sender_role"] == "student":
+                    messages.append(HumanMessage(content=conv["message"]))
+                else:
+                    # Assuming 'agent' or 'support' roles are the AI
+                    messages.append(AIMessage(content=conv["message"]))
             
             state.update({
                 "user_id": str(ticket["user_id"]),
                 "original_query": conversations[-1]['message'], # The latest message is the current query
                 "category": ticket["category"],
                 "messages": [HumanMessage(content=conversations[-1]['message'])],
-                "steps_taken": ["initialize"],
-                "conversation_history": "\n".join(history),
+                "steps_taken": ["initialize"]
             })
             print(f"INITIALIZED STATE: category={state['category']}, query='{state['original_query'][:50]}...'")
             return state
@@ -178,8 +179,8 @@ class EnhancedLangGraphWorkflow:
 
     async def generate_and_decide(self, state: GraphState) -> GraphState:
         """Generate a response or decide on the next action in a single step."""
-        print(f"GENERATE AND DECIDE for ticket {state['ticket_id']}")
-        
+        print(f"GENERATE AND DECIDE for ticket {state['ticket_id']}, {state["messages"]}")
+
         prompt = ChatPromptTemplate.from_messages([
             ("system", """You are 'Masai Agent', an AI support expert for Masai School. Your task is to analyze the user's query and available context to make a single, definitive decision.
 
@@ -208,11 +209,9 @@ AgentDecision Schema = {{
   "admin_type": "EC" | "IA",
   "confidence": "Your confidence score in the range [0.0, 1.0]. Must be a float."
 }}"""),
+
+            MessagesPlaceholder(variable_name="messages"),
             ("human", """Here is the data. Make your decision.
-
-**Full Conversation History:**
-{conversation_history}
-
 **Available Knowledge Base Context (Previously resolved tickets for reference / Program and Curriculum details):**
 {context}
 
@@ -224,7 +223,7 @@ AgentDecision Schema = {{
         chain = prompt | self.llm
         try:
             result = await chain.ainvoke({
-                "conversation_history": state["conversation_history"],
+                "messages": state["messages"],
                 "context": state["context"],
                 "query": state["original_query"]
             })
@@ -277,8 +276,8 @@ AgentDecision Schema = {{
             if not decision:
                 raise ValueError("Agent decision not found in state, cannot finalize.")
 
-            action = decision.get("decision").lower()
-            confidence = int(decision.get("confidence", 0.0))
+            action = decision.get("decision").lower().replace(" ", "_")
+            confidence = float(decision.get("confidence", 0.0))
 
             # Outcome 1: Request more information from the student
             if action == 'request_info' and decision.get('missing_info'):

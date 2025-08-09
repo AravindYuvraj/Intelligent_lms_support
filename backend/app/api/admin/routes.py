@@ -134,7 +134,7 @@ async def upload_document(
             "message": "Document uploaded successfully",
             "document_id": result["document_id"],
             "category": category,
-            "chunks_created": result["chunks_created"]
+            "items_created": result["items_created"]
         }
     except Exception as e:
         logger.error(f"Document upload error: {str(e)}")
