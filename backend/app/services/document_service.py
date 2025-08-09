@@ -10,6 +10,7 @@ import tempfile
 import mimetypes
 from typing import List, Dict, Any, Optional
 import time
+
 # Third-party imports
 import pandas as pd
 from fastapi import UploadFile
@@ -18,6 +19,9 @@ from pinecone import Pinecone, Index
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
+from bson.objectid import ObjectId
+import gridfs
+import functools
 
 # Import parsers and handle potential ImportErrors
 try:
@@ -44,44 +48,19 @@ except ImportError:
     Image, pytesseract = None, None
 
 # Local application imports
-# --- Assumed Configuration in backend/app/core/config.py ---
-# from pydantic_settings import BaseSettings
-#
-# class Settings(BaseSettings):
-#     # ... other settings
-#     PINECONE_API_KEY: str
-#     # New: A dictionary mapping categories to their Pinecone index names
-#     # This should be populated from your .env file
-#     PINECONE_INDEX_MAP: Dict[str, str] = {
-#         "Program Details": "program-details-index",
-#         "Q&A": "qa-index",
-#         "Curriculum Documents": "curriculum-index"
-#     }
-#     # New: A dictionary mapping categories to their MongoDB collection names
-#     MONGO_COLLECTION_MAP: Dict[str, str] = {
-#         "Program Details": "program_details_documents",
-#         "Q&A": "qa_documents",
-#         "Curriculum Documents": "curriculum_documents"
-#     }
-#
-# settings = Settings()
-# -----------------------------------------------------------------
 from backend.app.core.config import settings
 from backend.app.db.base import get_mongodb
 
 logger = logging.getLogger(__name__)
 
 
-import functools
-
 async def run_in_threadpool(func, *args, **kwargs):
     """Runs a synchronous function in a separate thread to avoid blocking."""
     loop = asyncio.get_running_loop()
-    func = functools.partial(func, *args, **kwargs)
-    return await loop.run_in_executor(None, func)
+    # Use functools.partial to package the function and its arguments
+    func_with_args = functools.partial(func, *args, **kwargs)
+    return await loop.run_in_executor(None, func_with_args)
 
-
-import gridfs
 
 class DocumentService:
     """
@@ -92,12 +71,11 @@ class DocumentService:
         self.mongodb = get_mongodb()
         self.gridfs = gridfs.GridFS(self.mongodb)
         self.embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-mpnet-base-v2", 
-        model_kwargs={"device": "cpu"}, 
-        encode_kwargs={"normalize_embeddings": True}
+            model_name="sentence-transformers/all-mpnet-base-v2",
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True}
         )
 
-        # --- Refactor for Multi-Index Support ---
         self.pinecone_indices: Dict[str, Index] = {}
         if settings.PINECONE_API_KEY:
             self.pinecone = Pinecone(api_key=settings.PINECONE_API_KEY)
@@ -111,7 +89,6 @@ class DocumentService:
         else:
             self.pinecone = None
             logger.warning("PINECONE_API_KEY not set. Pinecone operations will be skipped.")
-        # -------------------------------------------
 
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
@@ -119,7 +96,7 @@ class DocumentService:
             length_function=len
         )
         self.collection_map = settings.MONGO_COLLECTION_MAP
-        self.valid_categories = self.collection_map
+        self.valid_categories = self.collection_map.keys()
 
     def _get_index(self, category: str) -> Optional[Index]:
         """Safely retrieves the Pinecone index for a given category."""
@@ -135,15 +112,13 @@ class DocumentService:
         """
         print("--- Processing file using dedicated Excel Q&A logic ---")
         try:
-            # 1. Read the Excel file into a pandas DataFrame
             with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
                 temp_file.write(file_content)
                 temp_path = temp_file.name
             
             df = await run_in_threadpool(pd.read_excel, temp_path)
-            os.unlink(temp_path) # Clean up the temporary file
+            os.unlink(temp_path)
 
-            # 2. Validate and prepare data
             if "message" not in df.columns or "Potential response" not in df.columns:
                 raise ValueError("Excel file must contain 'message' and 'Potential response' columns.")
             
@@ -151,11 +126,9 @@ class DocumentService:
             if df.empty:
                 raise ValueError("No valid rows found in the Excel file.")
 
-            # 3. Embed all 'message' columns in a single batch
             messages_to_embed = df["message"].tolist()
             embeddings = await self.embeddings.aembed_documents(messages_to_embed)
 
-            # 4. Prepare vectors with 'Potential response' in metadata
             vectors = []
             for index, row in df.iterrows():
                 vector = {
@@ -171,20 +144,35 @@ class DocumentService:
                 }
                 vectors.append(vector)
 
-            # 5. Store vectors in the correct Pinecone index
             index = self._get_index(category)
             if index:
-                for i in range(0, len(vectors), 100): # Upsert in batches
+                for i in range(0, len(vectors), 100):
                     batch = vectors[i:i + 100]
                     await run_in_threadpool(index.upsert, vectors=batch)
                 logger.info(f"Stored {len(vectors)} Q&A pairs in Pinecone for doc {doc_id}")
 
+            mime_type, _ = mimetypes.guess_type(filename)
+            gridfs_id = await run_in_threadpool(self.gridfs.put, file_content, filename=filename, content_type=mime_type)
+
+            collection_name = self.collection_map[category]
+            document_metadata = {
+                "doc_id": doc_id,
+                "file_name": filename,
+                "gridfs_id": str(gridfs_id),
+                "category": category,
+                "chunk_count": len(vectors),
+                "metadata": {"file_type": mime_type, "file_size": len(file_content)}
+            }
+            collection = self.mongodb[collection_name]
+            await run_in_threadpool(collection.insert_one, document_metadata)
+            logger.info(f"Stored metadata for Excel doc {doc_id} in MongoDB collection '{collection_name}'.")
+            
             return {"document_id": doc_id, "items_created": len(vectors)}
 
         except Exception as e:
             logger.error(f"Excel processing error for '{filename}': {e}", exc_info=True)
             raise e
-    
+
     async def upload_document(self, file: UploadFile, category: str) -> Dict[str, Any]:
         """Upload, process, and index a document into its specified category index."""
         if category not in self.collection_map:
@@ -194,8 +182,6 @@ class DocumentService:
             doc_id = str(uuid.uuid4())
             content = await file.read()
 
-            # --- NEW LOGIC BLOCK ---
-            # Check if the file is an Excel file to route it to the special processor
             mime_type, _ = mimetypes.guess_type(file.filename)
             is_excel = mime_type in [
                 'application/vnd.ms-excel',
@@ -203,33 +189,26 @@ class DocumentService:
             ] or file.filename.endswith(('.xlsx', '.xls'))
 
             if is_excel:
-                # If it's Excel, use the dedicated Q&A processing method and return
                 return await self._process_and_store_excel(content, file.filename, doc_id, category)
-            # --- END OF NEW LOGIC BLOCK ---
 
-            mime_type, _ = mimetypes.guess_type(file.filename)
-            mime_type = mime_type or file.content_type or 'application/octet-stream'
-
-            text_content = await self._extract_text_content(content, file.filename, mime_type)
+            final_mime_type = mime_type or file.content_type or 'application/octet-stream'
+            text_content = await self._extract_text_content(content, file.filename, final_mime_type)
             if not text_content or not text_content.strip():
                 raise ValueError("No text content could be extracted from the file.")
 
-            chunks = await run_in_threadpool(self.text_splitter.split_text, text_content)
+            chunks = self.text_splitter.split_text(text_content)
 
-            # Store the large file content in GridFS
-            gridfs_id = await run_in_threadpool(self.gridfs.put, content, filename=file.filename, content_type=mime_type)
+            gridfs_id = await run_in_threadpool(self.gridfs.put, content, filename=file.filename, content_type=final_mime_type)
 
-            # Store metadata in the correct MongoDB collection (without the full content)
             collection_name = self.collection_map[category]
             document = {
                 "doc_id": doc_id, "file_name": file.filename, "gridfs_id": str(gridfs_id),
                 "category": category, "chunk_count": len(chunks),
-                "metadata": {"file_type": mime_type, "file_size": len(content)}
+                "metadata": {"file_type": final_mime_type, "file_size": len(content)}
             }
             collection = self.mongodb[collection_name]
             await run_in_threadpool(collection.insert_one, document)
             
-            # Embed and store in the category-specific Pinecone index
             index = self._get_index(category)
             if index:
                 await self._store_in_pinecone(index, doc_id, chunks, category, file.filename)
@@ -238,42 +217,33 @@ class DocumentService:
             return {"document_id": doc_id, "items_created": len(chunks)}
             
         except Exception as e:
-            print(f"Upload error for '{file.filename}': ",e)
+            logger.error(f"Upload error for '{file.filename}': {e}", exc_info=True)
             raise e
-
+            
     async def _store_in_pinecone(self, index: Index, doc_id: str, chunks: List[str], category: str, filename: str):
         """Asynchronously embed and store document chunks in a specific Pinecone index."""
         try:
-            retries = 3
-            backoff_time = 1
-            for i in range(retries):
-                try:
-                    embeddings = await self.embeddings.aembed_query(chunks)
-                    break
-                except Exception as e:
-                    if "504 Deadline Exceeded" in str(e) and i < retries - 1:
-                        print(f"Embedding failed: {e}. Retrying in {backoff_time} seconds...")
-                        time.sleep(backoff_time)
-                        backoff_time *= 2  # Exponential backoff
-                    else:
-                        print(f"Embedding failed after {i + 1} attempts: {e}")
-                        raise # Re-raise the exception if all retries fail
+            # 1. Correctly use embed_documents for a list of chunks and wrap in threadpool
+            embeddings = await run_in_threadpool(self.embeddings.embed_documents, chunks)
+
             vectors = [
                 {"id": f"{doc_id}_chunk_{i}", "values": embedding,
-                 "metadata": {"doc_id": doc_id, "category": category, "filename": filename, "text_snippet": chunk[:500]}}
+                "metadata": {"doc_id": doc_id, "category": category, "filename": filename, "text_snippet": chunk[:500]}}
                 for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
             ]
             
-            # Upsert in batches
+            # 2. Upsert in batches
             for i in range(0, len(vectors), 100):
                 batch = vectors[i:i + 100]
                 await run_in_threadpool(index.upsert, vectors=batch)
 
-            index_name = next((name for name, idx in self.pinecone_indices.items() if idx == index), "unknown")
+            index_name = settings.PINECONE_INDEX_MAP.get(category, "unknown")
             logger.info(f"Stored {len(vectors)} vectors in Pinecone index '{index_name}' for doc {doc_id}")
+
         except Exception as e:
             logger.error(f"Pinecone storage error for index '{index_name}': {e}")
             raise e
+            
 
     async def delete_document(self, doc_id: str):
         """Deletes a document from MongoDB and its vectors from the corresponding Pinecone index."""
@@ -306,62 +276,28 @@ class DocumentService:
                 logger.info(f"Deleted vectors for {doc_id} from Pinecone index '{index_name}'.")
 
         except Exception as e:
-            logger.error(f"Deletion error for doc {doc_id}: {e}")
+            logger.error(f"Deletion error for doc {doc_id}: {e}", exc_info=True)
             raise e
 
-    # --- New Search Functionality ---
     async def search_documents(self, query: str, categories: Optional[List[str]] = None, top_k: int = 5) -> List[Dict[str, Any]]:
-        """
-        Search for documents by embedding a query and searching one or more Pinecone indices.
-
-        Args:
-            query: The user's search query.
-            categories: A list of categories to search. If None, searches all configured indices.
-            top_k: The number of results to return.
-
-        Returns:
-            A list of ranked search results.
-        """
+        """Search for documents by embedding a query and searching one or more Pinecone indices."""
         if not self.pinecone:
             logger.warning("Pinecone is not configured. Cannot perform search.")
             return []
         
-        print("--- DOCUMENT SERVICE DEBUG ---")
-        print(f"Received categories for search: {categories}")
-        print(f"Available Pinecone index keys in service: {list(self.pinecone_indices.keys())}")
-
-        # Determine which indices to search
         indices_to_search = {}
-        if categories:
-            for cat in categories:
-                if cat in self.pinecone_indices:
-                    indices_to_search[cat] = self.pinecone_indices[cat]
-        else: # If no categories are specified, search all of them
-            indices_to_search = self.pinecone_indices
+        target_categories = categories or self.pinecone_indices.keys()
+        for cat in target_categories:
+            if cat in self.pinecone_indices:
+                indices_to_search[cat] = self.pinecone_indices[cat]
 
         if not indices_to_search:
-            logger.warning(f"No valid indices found for categories: {categories}")
+            logger.warning(f"No valid indices found for specified categories: {categories}")
             return []
 
         try:
-            # 1. Generate a single embedding for the query
-            retries = 3
-            backoff_time = 1
-            for i in range(retries):
-                try:
-                    query_embedding = await self.embeddings.aembed_query(query)
-                    break
-                except Exception as e:
-                    if "504 Deadline Exceeded" in str(e) and i < retries - 1:
-                        print(f"Embedding failed: {e}. Retrying in {backoff_time} seconds...")
-                        time.sleep(backoff_time)
-                        backoff_time *= 2  # Exponential backoff
-                    else:
-                        print(f"Embedding failed after {i + 1} attempts: {e}")
-                        raise # Re-raise the exception if all retries fail
-            print(f"Generated embedding vector of length: {len(query_embedding)} in document service")
+            query_embedding = await self.embeddings.aembed_query(query)
 
-            # 2. Asynchronously query all specified indices in parallel
             async def query_index(index: Index):
                 return await run_in_threadpool(
                     index.query,
@@ -373,15 +309,12 @@ class DocumentService:
             tasks = [query_index(index) for index in indices_to_search.values()]
             query_results = await asyncio.gather(*tasks)
 
-            # 3. Merge, rank, and format the results
             all_matches = []
             for result in query_results:
                 all_matches.extend(result.get('matches', []))
 
-            # Sort all collected matches by their similarity score in descending order
             sorted_matches = sorted(all_matches, key=lambda x: x.get('score', 0), reverse=True)
             
-            # 4. Format the final output
             final_results = []
             for match in sorted_matches[:top_k]:
                 metadata = match.get('metadata', {})
@@ -397,52 +330,47 @@ class DocumentService:
             return final_results
 
         except Exception as e:
-            logger.error(f"Error during document search for query '{query}': {e}")
+            logger.error(f"Error during document search for query '{query}': {e}", exc_info=True)
             raise e
 
     async def _extract_text_content(self, content: bytes, filename: str, mime_type: str) -> str:
         """Dispatcher to extract text from various file types using non-blocking calls."""
         suffix = os.path.splitext(filename)[1].lower()
+        
+        # Use a temporary file for libraries that need a file path
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             temp_file.write(content)
             temp_path = temp_file.name
         
         try:
-            # PDF files
             if mime_type == 'application/pdf' or suffix == '.pdf':
                 return await self._extract_from_pdf(temp_path)
-            # Excel & CSV files
-            elif suffix in ['.xlsx', '.xls', '.csv']:
-                return await self._extract_from_excel(temp_path)
-            # Word documents
             elif suffix in ['.doc', '.docx']:
-                 return await self._extract_from_word(temp_path)
-            # PowerPoint files
+                return await self._extract_from_word(temp_path)
             elif suffix in ['.ppt', '.pptx']:
                 return await self._extract_from_powerpoint(temp_path)
-            # Image files (OCR)
             elif mime_type.startswith('image/'):
                 return await self._extract_from_image(temp_path)
-            # Text files (fallback for many types)
-            else:
+            else: # Fallback for text-based files like .txt, .csv, etc.
                 return await self._extract_from_text(content)
         finally:
-            # Clean up temp file
-            await run_in_threadpool(os.unlink, temp_path)
+            os.unlink(temp_path)
 
     async def _extract_from_pdf(self, file_path: str) -> str:
         if not PdfReader:
-            raise ImportError("PDF processing libraries not installed. Please run 'pip install pypdf langchain-community'.")
+            raise ImportError("PDF processing library not installed. Run 'pip install pypdf'.")
         try:
-            text_content = []
             reader = await run_in_threadpool(PdfReader, file_path)
+            text_content = []
             for i, page in enumerate(reader.pages):
-                page_text = await run_in_threadpool(page.extract_text)
+                page_text = page.extract_text()
                 if page_text and page_text.strip():
                     text_content.append(f"--- Page {i+1} ---\n{page_text.strip()}")
             return "\n\n".join(text_content)
         except Exception as e:
             logger.warning(f"pypdf failed for {file_path}: {e}. Falling back to Langchain loader.")
+            if not PyPDFLoader:
+                raise ImportError("Langchain PDF loader not installed. Run 'pip install langchain-community'.")
             try:
                 loader = PyPDFLoader(file_path)
                 docs = await run_in_threadpool(loader.load)
@@ -453,13 +381,14 @@ class DocumentService:
 
     async def _extract_from_word(self, file_path: str) -> str:
         if not Document:
-            raise ImportError("Word processing library not installed. Please run 'pip install python-docx'.")
+            raise ImportError("Word processing library not installed. Run 'pip install python-docx'.")
         try:
             doc = await run_in_threadpool(Document, file_path)
-            text_parts = [p.text for p in doc.paragraphs if p.text and p.text.strip()]
-            return "\n".join(text_parts)
+            return "\n".join([p.text for p in doc.paragraphs if p.text and p.text.strip()])
         except Exception as e:
             logger.warning(f"python-docx failed: {e}. Falling back to Docx2txtLoader.")
+            if not Docx2txtLoader:
+                raise ImportError("Langchain Word loader not installed. Run 'pip install docx2txt'.")
             try:
                 loader = Docx2txtLoader(file_path)
                 docs = await run_in_threadpool(loader.load)
@@ -470,7 +399,7 @@ class DocumentService:
 
     async def _extract_from_powerpoint(self, file_path: str) -> str:
         if not Presentation:
-            raise ImportError("PowerPoint library not installed. Please run 'pip install python-pptx'.")
+            raise ImportError("PowerPoint library not installed. Run 'pip install python-pptx'.")
         try:
             prs = await run_in_threadpool(Presentation, file_path)
             text_content = []
@@ -485,9 +414,9 @@ class DocumentService:
     
     async def _extract_from_image(self, file_path: str) -> str:
         if not Image or not pytesseract:
-            logger.warning("OCR dependencies not installed ('pip install pytesseract pillow'). OCR is disabled.")
-            raise ImportError("OCR dependencies not available.")
+            raise ImportError("OCR dependencies not installed. Run 'pip install pytesseract pillow'.")
         try:
+            # Pytesseract is CPU-bound, so run it in a thread
             return await run_in_threadpool(pytesseract.image_to_string, Image.open(file_path))
         except Exception as e:
             logger.error(f"Image OCR error: {e}. Ensure Tesseract-OCR is installed on the system.")
@@ -502,23 +431,31 @@ class DocumentService:
                 continue
         raise ValueError("Could not decode text file with common encodings.")
 
-
     async def list_documents(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Lists document metadata from MongoDB."""
+        """Lists document metadata from MongoDB, handling blocking calls correctly."""
         documents = []
-        collections_to_search = self.valid_categories.values()
-
+        collections_to_search = []
         if category:
-            if category not in self.valid_categories:
-                return []
-            collections_to_search = [self.valid_categories[category]]
+            if category in self.collection_map:
+                collections_to_search.append(self.collection_map[category])
+        else:
+            collections_to_search = self.collection_map.values()
+        
+        if not collections_to_search:
+            return []
+
+        def fetch_and_process_docs(collection):
+            """Sync function to be run in a thread."""
+            docs = []
+            for doc in collection.find({}):
+                doc["_id"] = str(doc["_id"]) # Convert ObjectId to string
+                docs.append(doc)
+            return docs
 
         for collection_name in collections_to_search:
             collection = self.mongodb[collection_name]
-            # Use run_in_threadpool for the blocking cursor iteration
-            cursor = await run_in_threadpool(collection.find, {})
-            for doc in cursor:
-                doc["_id"] = str(doc["_id"])
-                documents.append(doc)
+            # CORRECTED: Run the entire blocking DB operation in the thread pool
+            docs_list = await run_in_threadpool(fetch_and_process_docs, collection)
+            documents.extend(docs_list)
         
         return documents
