@@ -7,15 +7,18 @@ from backend.app.db.base import get_redis
 from backend.app.core.config import settings
 import logging
 from zoneinfo import ZoneInfo 
+import time
+from langchain_huggingface import HuggingFaceEmbeddings
 
 logger = logging.getLogger(__name__)
 
 class SemanticCacheService:
     def __init__(self):
         self.redis_client = get_redis()
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=settings.GOOGLE_API_KEY
+        self.embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-mpnet-base-v2", 
+        model_kwargs={"device": "cpu"}, 
+        encode_kwargs={"normalize_embeddings": True}
         )
     
     async def search_similar(self, query: str, threshold: float = 0.85) -> Optional[Dict[str, Any]]:
@@ -23,9 +26,21 @@ class SemanticCacheService:
         try:
             print(f"CACHE SEARCH: query='{query[:50]}...', threshold={threshold}")
             
-            # Generate embedding for the query
-            query_embedding = await self.embeddings.aembed_query(query)
-            query_vector = np.array(query_embedding)
+            retries = 3
+            backoff_time = 1
+            for i in range(retries):
+                try:
+                    query_embedding = await self.embeddings.aembed_query(query)
+                    query_vector = np.array(query_embedding)
+                    break
+                except Exception as e:
+                    if "504" in str(e) and i < retries - 1:
+                        print(f"Embedding failed: {e}. Retrying in {backoff_time} seconds...")
+                        time.sleep(backoff_time)
+                        backoff_time *= 2  # Exponential backoff
+                    else:
+                        print(f"Embedding failed after {i + 1} attempts: {e}")
+                        raise # Re-raise the exception if all retries fail
             
             print(f"Generated embedding vector of length: {len(query_vector)}")
             
@@ -75,7 +90,7 @@ class SemanticCacheService:
             return None
             
         except Exception as e:
-            print(f"Semantic cache search error")
+            print(f"Semantic cache search error", e)
             return None
     
     async def store_response(

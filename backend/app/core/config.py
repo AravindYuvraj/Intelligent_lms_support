@@ -30,11 +30,6 @@ class Settings(BaseSettings):
     PINECONE_INDEX_MAP: Dict[str, str]
     MONGO_COLLECTION_MAP: Dict[str, str]
     
-    # --- Cloudinary Configuration (Optional) ---
-    CLOUDINARY_CLOUD_NAME: Optional[str] = None
-    CLOUDINARY_API_KEY: Optional[str] = None
-    CLOUDINARY_API_SECRET: Optional[str] = None
-    
     # --- LangSmith Configuration (Optional) ---
     LANGCHAIN_TRACING_V2: Optional[bool] = True
     LANGCHAIN_API_KEY: Optional[str] = None

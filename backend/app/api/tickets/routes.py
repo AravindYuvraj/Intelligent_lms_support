@@ -93,7 +93,8 @@ async def add_message_to_ticket(
     ticket_service.update_ticket_timestamp(ticket_id)
 
     # Process ticket through LangGraph workflow in background
-    background_tasks.add_task(process_ticket_sync, ticket_id)
+    if current_user["role"] == "student":
+        background_tasks.add_task(process_ticket_async, ticket_id)
 
     # Fetch the newly created conversation to return
     new_conv = conversation_service.get_conversation_by_id(conv_id)
@@ -258,7 +259,7 @@ async def reopen_ticket(
     )
     
     # Start background processing for the reopened ticket
-    background_tasks.add_task(process_ticket_sync, ticket_id)
+    background_tasks.add_task(process_ticket_async, ticket_id)
     
     return TicketReopenResponse(
         message="Ticket reopened successfully and sent for processing",
