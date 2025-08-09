@@ -11,6 +11,7 @@ from .state import AgentState, WorkflowStep
 
 logger = logging.getLogger(__name__)
 
+
 class RetrieverAgent:
     """
     An agent responsible for retrieving relevant context from the knowledge base
@@ -26,21 +27,25 @@ class RetrieverAgent:
             print(f"Failed to initialize DocumentService: {e}")
             self.document_service = None
 
+                # FIX: Define confidence thresholds as instance attributes for robustness.
+        self.HIGH_CONFIDENCE_THRESHOLD = 0.85
+        self.MEDIUM_CONFIDENCE_THRESHOLD = 0.75
+        self.MIN_HIGH_CONFIDENCE_DOCS = 3 # Minimum docs to accept the high-confidence tier
+
 
     async def process(self, state: AgentState) -> AgentState:
         """
-        Processes the user query to retrieve relevant context from the knowledge base.
+        Processes the user query to retrieve relevant context using a tiered
+        confidence approach.
         """
         ticket_id = state.get("ticket_id", "unknown")
         category = state.get("category", "N/A")
-        print(f"RETRIEVER AGENT: Processing ticket {state.get("rewritten_query", "query")}'")
         query = state.get("rewritten_query", state["original_query"])
         
-        print(f"RETRIEVER AGENT: Processing query for ticket {ticket_id}")
-        print(f"Category: '{category}', Query: '{query[:50]}...'")
-        
+        print(f"RETRIEVER AGENT: Processing ticket '{ticket_id}' with query '{query}'")
+        print(f"Original Category: '{category}'")
+
         try:
-            # Check if document service is available
             if not self.document_service:
                 raise Exception("DocumentService not initialized")
             
@@ -53,85 +58,77 @@ class RetrieverAgent:
                 state["current_step"] = WorkflowStep.RESPONSE_GENERATION.value
                 return state
 
-            print(f"Mapped to KB category: '{kb_category}'")
+            # 1. Map category and define search scope
+            primary_kb_category = self._get_kb_category(category)
+            search_categories = [primary_kb_category]
+            if primary_kb_category != 'qa_documents':
+                search_categories.append('qa_documents')
+            
+            print(f"Searching in categories: {search_categories}")
 
-            # 2. Use the DocumentService to perform the search.
-            print(f"Searching with query: '{query}'")
+            # 2. Perform a single, consolidated search to get a candidate pool
             search_results = await self.document_service.search_documents(
                 query=query,
-                categories=[kb_category],
-                top_k=5
+                categories=search_categories,
+                top_k=10 # Fetch a larger pool for better filtering
             )
+            print(f"Retrieved {len(search_results)} total candidate documents.")
+
+            # 3. Apply the tiered confidence filtering logic
+            selected_chunks = []
             
-            high_score_results = [r for r in search_results if r.get("score", 0) >= 0.8]
+            # Tier 1: High-Confidence
+            high_confidence_results = [r for r in search_results if r.get("score", 0) >= self.HIGH_CONFIDENCE_THRESHOLD]
+            if len(high_confidence_results) >= self.MIN_HIGH_CONFIDENCE_DOCS:
+                print(f"SUCCESS: Found {len(high_confidence_results)} documents meeting high-confidence threshold ({self.HIGH_CONFIDENCE_THRESHOLD}).")
+                selected_chunks = high_confidence_results
+            
+            # Tier 2: Medium-Confidence
+            elif not selected_chunks:
+                medium_confidence_results = [r for r in search_results if r.get("score", 0) >= self.MEDIUM_CONFIDENCE_THRESHOLD]
+                if medium_confidence_results:
+                    print(f"FALLBACK: Using {len(medium_confidence_results)} documents from medium-confidence threshold ({self.MEDIUM_CONFIDENCE_THRESHOLD}).")
+                    selected_chunks = medium_confidence_results
+            
+            # Tier 3: Best-Effort Fallback
+            if not selected_chunks and search_results:
+                print("FALLBACK: No documents met thresholds. Using top 5 best-effort results.")
+                # We still re-rank to ensure the absolute best are at the top
+                sorted_by_score = sorted(search_results, key=lambda x: x.get("score", 0.0), reverse=True)
+                selected_chunks = sorted_by_score[:5]
 
-            if len(high_score_results) < 5 and kb_category != 'qa_documents':
-                # Filter out low-score results from main search
-                search_results = high_score_results
+            # 4. Re-rank the chunks selected by our tiered logic
+            reranked_chunks = await self._rerank_chunks(selected_chunks, query)
+            top_results = reranked_chunks[:5] # Ensure we don't exceed 5 final results
 
-                # Search in 'qa_documents'
-                extra_results = await self.document_service.search_documents(
-                    query=query,
-                    categories=['qa_documents'],
-                    top_k=5
-                )
-
-                # Keep only high-score extra results
-                extra_results = [r for r in extra_results if r.get("score", 0) >= 0.8]
-
-                # Merge results without duplicates
-                search_results.extend(r for r in extra_results if r not in search_results)
-
-            print(f"Raw search results: {len(search_results)} documents found")
-            if search_results:
-                for i, result in enumerate(search_results[:3]):  # Log first 3 results
-                    score = result.get("score", 0)
-                    # FIX: Use 'text_snippet' here for the preview
-                    content_preview = result.get("text_snippet", "")[:100]
-                    filename = result.get("filename", "unknown")
-                    print(f"i, result", i, result)
-                    print(f"Result {i+1}: score={score:.3f}, file='{filename}', content='{content_preview}...'")
-
-            # 3. Process and re-rank the results
-            reranked_chunks = await self._rerank_chunks(search_results, query)
-            top_results = reranked_chunks[:5]
-                
-            # 4. Format the final context, giving priority to Q&A pairs
+            # 5. Format the final context for the LLM
             final_context = []
             for result in top_results:
-                potential_response = result.get("potential_response")
-                
-                # If a pre-canned answer exists, format it clearly for the LLM
-                if potential_response:
+                if result.get("potential_response"):
                     result['content'] = (
                         f"A relevant Q&A pair was found in the knowledge base.\n"
                         f"Question: {result.get('text_snippet', '')}\n"
-                        f"Answer: {potential_response}"
+                        f"Answer: {result.get('potential_response')}"
                     )
                 else:
-                    # For regular documents, the content is just the text snippet
                     result['content'] = result.get('text_snippet', '')
-                    
                 final_context.append(result)
 
-            # 5. Update the state with the fully prepared context
+            # 6. Update the state
             state["retrieved_context"] = final_context
             state["current_step"] = WorkflowStep.RESPONSE_GENERATION.value
-                    
-            context_count = len(final_context)
-            if context_count == 0:
-                print(f" NO RELEVANT CONTEXT found for ticket {ticket_id}")
+            
+            if not final_context:
+                print(f"NO RELEVANT CONTEXT ultimately selected for ticket {ticket_id}.")
             else:
-                print(f"SELECTED {context_count} top chunks for context")
-                # Log the best chunk
-                if final_context:
-                    best_chunk = final_context[0]
-                    print(f"Best chunk: score={best_chunk.get('score', 0):.3f}, content='{best_chunk.get('content', '')[:100]}...'")
+                print(f"SELECTED {len(final_context)} top chunks for context for ticket {ticket_id}.")
+                best_chunk = final_context[0]
+                print(f"Best chunk details: score={best_chunk.get('score', 0):.3f}, content='{best_chunk.get('content', '')[:100]}...'")
 
             return state
                 
         except Exception as e:
-            print(f"RETRIEVER AGENT ERROR for ticket {ticket_id}: ",e)
+            print(f"RETRIEVER AGENT ERROR for ticket {ticket_id}: {e}")
             state["error_message"] = f"Context retrieval failed: {str(e)}"
             state["requires_escalation"] = True
             state["current_step"] = WorkflowStep.ESCALATION.value
@@ -192,23 +189,21 @@ class RetrieverAgent:
         """
         if not chunks:
             print("No chunks to rerank")
-            return chunks
+            return []
         
-        print(f"RERANKING {len(chunks)} chunks")
+        print(f"RERANKING {len(chunks)} chunks based on score.")
         
-        # Sort by score (assuming higher scores are better)
+        # Sort by score (assuming higher scores from Pinecone are better)
         try:
             sorted_chunks = sorted(chunks, key=lambda x: x.get("score", 0.0), reverse=True)
             
-            # Log reranking results
-            if len(sorted_chunks) > 0:
+            if sorted_chunks:
                 best_score = sorted_chunks[0].get("score", 0)
                 worst_score = sorted_chunks[-1].get("score", 0)
-                print(f"Reranked: best_score={best_score:.3f}, worst_score={worst_score:.3f}")
+                print(f"Reranked scores range from {best_score:.3f} to {worst_score:.3f}")
             
             return sorted_chunks
             
         except Exception as e:
-            print(f"Reranking failed: {e}, returning original order")
+            print(f"Reranking failed due to an error: {e}, returning original order")
             return chunks
-    
