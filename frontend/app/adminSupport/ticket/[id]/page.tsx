@@ -102,7 +102,7 @@ export default function AdminTicketDetailPage() {
   };
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
     return new Intl.DateTimeFormat("en-IN", {
       timeZone: "Asia/Kolkata",
       year: "numeric",
@@ -176,6 +176,45 @@ export default function AdminTicketDetailPage() {
                 ? "WORK IN PROGRESS"
                 : ticket.ticket.status.toUpperCase()}
             </Badge>
+            {ticket.ticket.status !== 'Resolved' &&   <Button
+              className="ml-2 bg-green-600 text-white hover:bg-green-700"
+              onClick={async () => {
+                const messageInput = document.querySelector("textarea");
+                const message = messageInput?.value || "Ticket resolved.";
+
+                try {
+                  const formData = new FormData();
+                  formData.append('message', message);
+
+                  const response = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_BASE}/v1/admin/tickets/${params.id}/resolve`,
+                    {
+                      method: "POST",
+                      credentials: "include",
+                      body: formData,
+                    }
+                  );
+                  if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                  }
+                  const updatedTicket = await response.json();
+                  setTicket((prevTicket) => {
+                    if (!prevTicket) return null;
+                    return {
+                      ...prevTicket,
+                      ticket: { ...prevTicket.ticket, status: updatedTicket.ticket_status },
+                    };
+                  });
+                  if (messageInput) {
+                    messageInput.value = ""; // Clear the textarea
+                  }
+                } catch (error) {
+                  console.error("Failed to resolve ticket:", error);
+                }
+              }}
+            >
+              Mark as Resolved
+            </Button>}
           </div>
         </div>
 

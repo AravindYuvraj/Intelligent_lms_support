@@ -71,7 +71,7 @@ class TicketRatingRequest(BaseModel):
 # For ticket reopening - just reopen the same ticket, don't need additional message
 class TicketReopenResponse(BaseModel):
     message: str
-    ticket_id: int
+    ticket_id: str
     status: str
 
 class TicketMessageRequest(BaseModel):

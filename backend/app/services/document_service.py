@@ -241,42 +241,39 @@ class DocumentService:
             logger.info(f"Stored {len(vectors)} vectors in Pinecone index '{index_name}' for doc {doc_id}")
 
         except Exception as e:
-            # 3. Correctly get the index name for logging from your settings map
-            index_name = settings.PINECONE_INDEX_MAP.get(category, "unknown")
-            logger.error(f"Pinecone storage error for index '{index_name}': {e}", exc_info=True)
+            logger.error(f"Pinecone storage error for index '{index_name}': {e}")
             raise e
             
 
     async def delete_document(self, doc_id: str):
         """Deletes a document from MongoDB and its vectors from the corresponding Pinecone index."""
         try:
+            from bson.objectid import ObjectId
+            object_id = ObjectId(doc_id)
             doc_category = None
-            found_doc = None
 
+            # Find and delete document from MongoDB + GridFS
             for category, collection_name in self.collection_map.items():
                 collection = self.mongodb[collection_name]
-                doc = await run_in_threadpool(collection.find_one_and_delete, {"doc_id": doc_id})
-                if doc:
-                    found_doc = doc
+                doc = await run_in_threadpool(collection.find_one_and_delete, {"_id": object_id})
+                if doc and 'gridfs_id' in doc:
+                    await run_in_threadpool(self.gridfs.delete, doc['gridfs_id'])
                     doc_category = category
-                    logger.info(f"Deleted document metadata {doc_id} from MongoDB collection '{collection_name}'.")
+                    logger.info(
+                        f"Deleted document {doc_id} and its GridFS file from MongoDB collection '{collection_name}'."
+                    )
                     break
-            
-            if not found_doc:
+
+            if not doc_category:
                 raise ValueError(f"Document {doc_id} not found in any collection.")
 
-            if 'gridfs_id' in found_doc:
-                try:
-                    gridfs_id_obj = ObjectId(found_doc['gridfs_id'])
-                    await run_in_threadpool(self.gridfs.delete, gridfs_id_obj)
-                    logger.info(f"Deleted GridFS file for doc {doc_id}.")
-                except Exception as e:
-                    logger.error(f"Failed to delete GridFS file for doc {doc_id} with gridfs_id {found_doc['gridfs_id']}: {e}")
-
+            # Delete from Pinecone
             index = self._get_index(doc_category)
             if index:
+                # Get the name from your settings mapping, not index.name
+                index_name = settings.PINECONE_INDEX_MAP[doc_category]
                 await run_in_threadpool(index.delete, filter={"doc_id": doc_id})
-                logger.info(f"Deleted vectors for {doc_id} from Pinecone index '{index.name}'.")
+                logger.info(f"Deleted vectors for {doc_id} from Pinecone index '{index_name}'.")
 
         except Exception as e:
             logger.error(f"Deletion error for doc {doc_id}: {e}", exc_info=True)

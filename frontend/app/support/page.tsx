@@ -99,7 +99,7 @@ export default function SupportPage() {
   }
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
     return new Intl.DateTimeFormat("en-IN", {
       timeZone: "Asia/Kolkata",
       year: "numeric",

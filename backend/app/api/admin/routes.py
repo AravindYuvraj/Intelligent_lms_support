@@ -38,10 +38,9 @@ async def get_admin_tickets(
 async def respond_to_ticket(
     ticket_id: str,
     message: str = Form(...),
-    status: str = Form(...),  # "Resolved" or "Work in Progress"
     current_user: Dict[str, Any] = Depends(get_current_admin)
 ):
-    """Admin responds to a ticket."""
+    """Admin responds to a ticket, setting status to Work in Progress"""
     
     ticket = ticket_service.get_ticket_by_id(ticket_id)
     if not ticket:
@@ -50,13 +49,8 @@ async def respond_to_ticket(
             detail="Ticket not found"
         )
     
-    if status not in ["Resolved", "Work in Progress"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid status. Must be 'Resolved' or 'Work in Progress'"
-        )
-    
-    new_status = TicketStatus.RESOLVED.value if status == "Resolved" else TicketStatus.WIP.value
+    # Update ticket status to Work in Progress
+    new_status = TicketStatus.WIP.value
     ticket_service.update_ticket_status(ticket_id, new_status, current_user["id"])
     
     conversation_service.create_conversation(
@@ -66,25 +60,58 @@ async def respond_to_ticket(
         message=message
     )
     
-    if status == "Resolved":
-        try:
-            conversations = conversation_service.get_ticket_conversations(ticket_id)
-            original_conv = next((c for c in conversations if c["sender_role"] == "student"), None)
-            
-            if original_conv:
-                from backend.app.agents.cache_service import SemanticCacheService
-                cache_service = SemanticCacheService()
-                await cache_service.store_response(
-                    query=original_conv["message"],
-                    response=message,
-                    confidence=0.95,  # High confidence for human responses
-                    category=ticket["category"]
-                )
-        except Exception as e:
-            logger.error(f"Error storing admin response in cache: {str(e)}")
-    
     return {
         "message": "Response submitted successfully",
+        "ticket_status": new_status
+    }
+
+@router.post("/tickets/{ticket_id}/resolve")
+async def resolve_ticket(
+    ticket_id: str,
+    message: str = Form(...),
+    current_user: Dict[str, Any] = Depends(get_current_admin)
+):
+    """Admin resolves a ticket"""
+    
+    # Get ticket
+    ticket = ticket_service.get_ticket_by_id(ticket_id)
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+    
+    # Update ticket status to Resolved
+    new_status = TicketStatus.RESOLVED.value
+    ticket_service.update_ticket_status(ticket_id, new_status, current_user["id"])
+    
+    # Add conversation entry
+    conversation_service.create_conversation(
+        ticket_id=ticket_id,
+        sender_role="admin",
+        sender_id=current_user["id"],
+        message=message
+    )
+    
+    try:
+        # Get original query from first conversation
+        conversations = conversation_service.get_ticket_conversations(ticket_id)
+        original_conv = next((c for c in conversations if c["sender_role"] == "student"), None)
+        
+        if original_conv:
+            from backend.app.agents.cache_service import SemanticCacheService
+            cache_service = SemanticCacheService()
+            await cache_service.store_response(
+                query=original_conv["message"],
+                response=message,
+                confidence=0.95,  # High confidence for human responses
+                category=ticket["category"]
+            )
+    except Exception as e:
+        logger.error(f"Error storing admin response in cache: {str(e)}")
+    
+    return {
+        "message": "Ticket resolved successfully",
         "ticket_status": new_status
     }
 
