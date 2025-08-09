@@ -33,7 +33,8 @@ class RetrieverAgent:
         """
         ticket_id = state.get("ticket_id", "unknown")
         category = state.get("category", "N/A")
-        query = state.get("query", "")
+        print(f"RETRIEVER AGENT: Processing ticket {state.get("rewritten_query", "query")}'")
+        query = state.get("rewritten_query", state["original_query"])
         
         print(f"RETRIEVER AGENT: Processing query for ticket {ticket_id}")
         print(f"Category: '{category}', Query: '{query[:50]}...'")

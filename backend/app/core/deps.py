@@ -2,6 +2,8 @@ from fastapi import Depends, HTTPException, status, Cookie
 from backend.app.models import user_service, UserRole
 from backend.app.core.security import verify_session_token
 from typing import Optional, Dict, Any
+from backend.app.services.document_service import DocumentService
+
 
 def get_current_user(
     session_token: Optional[str] = Cookie(None, alias="session_token")
@@ -43,3 +45,11 @@ def get_current_admin(current_user: Dict[str, Any] = Depends(get_current_user)) 
             detail="Not enough permissions"
         )
     return current_user
+
+document_service_instance = DocumentService()
+
+# 3. Define the dependency function that the router is looking for
+def get_document_service():
+    """Dependency to get the singleton DocumentService instance."""
+    return document_service_instance
+
