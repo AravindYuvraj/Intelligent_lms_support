@@ -4,33 +4,12 @@ import DashboardLayout from "@/components/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getStatusColor } from "@/utils";
+import { Ticket } from "@/types";
+import { formatTimestamp, getStatusColor } from "@/utils";
 import { MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-interface Ticket {
-  id: string;
-  user_id: string;
-  category: string;
-  status:
-    | "Open"
-    | "Work in Progress"
-    | "Student Action Required"
-    | "Admin Action Required"
-    | "Resolved"
-    | "Closed";
-  title: string;
-  created_at: string;
-  updated_at?: string;
-  rating?: number;
-  assigned_to?: string;
-  assigned_admin_email?: string;
-  response_count: number;
-  last_response?: string;
-  last_response_time?: string;
-}
 
 export default function SupportPage() {
   const [activeTab, setActiveTab] = useState<"unresolved" | "resolved">(
@@ -97,19 +76,6 @@ export default function SupportPage() {
       </DashboardLayout>
     );
   }
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
-    return new Intl.DateTimeFormat("en-IN", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(date);
-  };
 
   return (
     <DashboardLayout>

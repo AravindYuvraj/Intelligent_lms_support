@@ -2,6 +2,7 @@ from typing import Dict, Any
 from backend.app.models import ticket_service, conversation_service, user_service, TicketStatus
 from .state import AgentState
 import logging
+from utils import find_available_admin
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class EscalationAgent:
             print(f"Escalating ticket {ticket_id} to an {admin_type} admin.")
 
             # 1. Find an available admin of the specified type
-            admin = await self._find_available_admin(admin_type)
+            admin = await find_available_admin(admin_type)
             admin_id = admin["id"] if admin else None
             
             # 2. Update ticket status to Admin Action Required and assign to admin
@@ -53,20 +54,6 @@ class EscalationAgent:
             print(f"Error in escalation agent for ticket {state['ticket_id']}:",e)
             state["error_message"] = str(e)
             return state
-    
-    async def _find_available_admin(self, admin_type: str) -> Dict[str, Any]:
-        """
-        Finds an available admin.
-        In a real system, this would check for load, online status, and specialty.
-        For now, it returns the first available admin.
-        """
-        try:
-            # This logic can be expanded to filter by EC/IA roles if they are stored in the user model
-            admins = user_service.get_admins()
-            return admins[0] if admins else None
-        except Exception as e:
-            logger.error(f"Error finding admin: {e}")
-            return None
     
     async def _notify_admin(self, admin: Dict[str, Any], ticket: Dict[str, Any]):
         """Placeholder for a real-time notification system (e.g., email, Slack, WebSocket)."""
