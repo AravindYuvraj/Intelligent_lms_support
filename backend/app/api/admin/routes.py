@@ -12,12 +12,13 @@ router = APIRouter()
 @router.get("/tickets", response_model=List[TicketListResponse])
 async def get_admin_tickets(
     status_filter: Optional[str] = None,
+    admin_type: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_admin)
 ):
     """Get all tickets that can be viewed by the admin"""
     
     # Get tickets for admin (assigned or unassigned)
-    tickets = ticket_service.get_admin_tickets(current_user["id"])
+    tickets = ticket_service.get_admin_tickets(current_user["id"], admin_type=admin_type)
     
     # Apply status filter if provided
     if status_filter:

@@ -51,7 +51,7 @@ class UserService(MongoBaseService):
         super().__init__()
         self.collection = self.db.users
     
-    def create_user(self, email: str, password_hash: str, role: str) -> str:
+    def create_user(self, email: str, password_hash: str, role: str, user_type: Optional[str] = None) -> str:
         """Create a new user"""
         user_doc = {
             "email": email,
@@ -59,6 +59,8 @@ class UserService(MongoBaseService):
             "role": role,
             "created_at": datetime.now(ZoneInfo("Asia/Kolkata"))
         }
+        if user_type:
+            user_doc["type"] = user_type
         
         result = self.collection.insert_one(user_doc)
         return str(result.inserted_id)
@@ -80,9 +82,12 @@ class UserService(MongoBaseService):
         except:
             return None
     
-    def get_admins(self) -> List[Dict[str, Any]]:
-        """Get all admin users"""
-        users = list(self.collection.find({"role": UserRole.ADMIN.value}))
+    def get_admins(self, admin_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all admin users, optionally filtered by type"""
+        query = {"role": UserRole.ADMIN.value}
+        if admin_type:
+            query["type"] = admin_type
+        users = list(self.collection.find(query))
         for user in users:
             user["id"] = str(user["_id"])
         return users
@@ -146,7 +151,7 @@ class TicketService(MongoBaseService):
             ticket["id"] = str(ticket["_id"])
         return tickets
     
-    def get_admin_tickets(self, admin_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_admin_tickets(self, admin_id: Optional[str] = None, admin_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get tickets for admin (assigned or unassigned)"""
         if admin_id:
             query = {"$or": [
@@ -155,6 +160,9 @@ class TicketService(MongoBaseService):
             ]}
         else:
             query = {"status": TicketStatus.ADMIN_ACTION_REQUIRED.value}
+
+        if admin_type:
+            query["assigned_to_type"] = admin_type
         
         tickets = list(self.collection.find(query).sort("created_at", -1))
         for ticket in tickets:

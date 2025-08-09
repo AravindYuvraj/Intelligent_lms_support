@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getStatusColor } from "@/utils";
-import { Bookmark, RotateCcw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -102,25 +101,6 @@ export default function AdminTicketDetailPage() {
     }
   };
 
-  const handleReopenTicket = async () => {
-    try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/reopen`,
-        {
-          method: "POST",
-          credentials: "include",
-        }
-      );
-
-      // Refresh the page or update state
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to reopen ticket:", error);
-    }
-  };
-
-  const ratingEmojis = ["😠", "😞", "😐", "😊", "😍"];
-
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return new Intl.DateTimeFormat("en-IN", {
@@ -197,25 +177,6 @@ export default function AdminTicketDetailPage() {
                 : ticket.ticket.status.toUpperCase()}
             </Badge>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
-              <Bookmark className="h-4 w-4 mr-2" />
-              BOOKMARK
-            </Button>
-
-            {ticket.ticket.status === "Resolved" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReopenTicket}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                REOPEN TICKET
-              </Button>
-            )}
-          </div>
         </div>
 
         {/* Ticket Info */}
@@ -289,112 +250,76 @@ export default function AdminTicketDetailPage() {
           ))}
         </div>
 
-        <div className="mt-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Send a Message
-          </h3>
-          <textarea
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Type your message here..."
-            rows={4}
-          ></textarea>
-          <input
-            type="file"
-            multiple
-            className="mt-3 p-2 border rounded-lg"
-            id="attachment-input"
-          />
-          <Button
-            className="mt-3 bg-blue-600 text-white hover:bg-blue-700"
-            onClick={async () => {
-              const messageInput = document.querySelector("textarea");
-              const attachmentInput = document.getElementById(
-                "attachment-input"
-              ) as HTMLInputElement;
-              const message = messageInput?.value;
-              const attachments = Array.from(attachmentInput?.files || []).map(
-                (file) => file.name
-              ); // Just sending names for now
+        {ticket.ticket.status !== "Resolved" && (
+          <div className="mt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Send a Message
+            </h3>
+            <textarea
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Type your message here..."
+              rows={4}
+            ></textarea>
+            <input
+              type="file"
+              multiple
+              className="mt-3 p-2 border rounded-lg"
+              id="attachment-input"
+            />
+            <Button
+              className="mt-3 bg-blue-600 text-white hover:bg-blue-700"
+              onClick={async () => {
+                const messageInput = document.querySelector("textarea");
+                const attachmentInput = document.getElementById(
+                  "attachment-input"
+                ) as HTMLInputElement;
+                const message = messageInput?.value;
+                const attachments = Array.from(
+                  attachmentInput?.files || []
+                ).map((file) => file.name); // Just sending names for now
 
-              if (message || attachments.length > 0) {
-                try {
-                  const response = await fetch(
-                    `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/messages`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      credentials: "include",
-                      body: JSON.stringify({ message, attachments }),
-                    }
-                  );
-                  if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                  }
-                  const newMessage = await response.json();
-                  setTicket((prevTicket) => {
-                    if (!prevTicket) return null;
-                    return {
-                      ...prevTicket,
-                      conversations: [...prevTicket.conversations, newMessage],
-                    };
-                  });
-                  if (messageInput) {
-                    messageInput.value = ""; // Clear the textarea
-                  }
-                  if (attachmentInput) {
-                    attachmentInput.value = ""; // Clear the file input
-                  }
-                } catch (error) {
-                  console.error("Failed to send message:", error);
-                }
-              }
-            }}
-          >
-            Send Message
-          </Button>
-        </div>
-
-        {/* Rating Section */}
-        {ticket.ticket.status === "Resolved" && (
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Rating & Feedback
-              </h3>
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-3">
-                  How happy are you with the assistance?
-                </p>
-                <div className="flex space-x-2">
-                  {ratingEmojis.map((emoji, index) => {
-                    const rating = index + 1;
-                    return (
-                      <button
-                        key={rating}
-                        onClick={() => handleRating(rating)}
-                        className={`text-2xl p-2 rounded-lg transition-all ${
-                          selectedRating === rating
-                            ? "bg-blue-100 scale-110"
-                            : "hover:bg-gray-100 hover:scale-105"
-                        }`}
-                      >
-                        {emoji}
-                      </button>
+                if (message || attachments.length > 0) {
+                  try {
+                    const response = await fetch(
+                      `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/messages`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        credentials: "include",
+                        body: JSON.stringify({ message, attachments }),
+                      }
                     );
-                  })}
-                </div>
-              </div>
-
-              {selectedRating && (
-                <div className="text-sm text-gray-600">
-                  Thank you for your feedback! You rated this resolution{" "}
-                  {selectedRating} out of 5.
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    if (!response.ok) {
+                      throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const newMessage = await response.json();
+                    setTicket((prevTicket) => {
+                      if (!prevTicket) return null;
+                      return {
+                        ...prevTicket,
+                        conversations: [
+                          ...prevTicket.conversations,
+                          newMessage,
+                        ],
+                      };
+                    });
+                    if (messageInput) {
+                      messageInput.value = ""; // Clear the textarea
+                    }
+                    if (attachmentInput) {
+                      attachmentInput.value = ""; // Clear the file input
+                    }
+                  } catch (error) {
+                    console.error("Failed to send message:", error);
+                  }
+                }
+              }}
+            >
+              Send Message
+            </Button>
+          </div>
         )}
       </div>
     </AdminDashboardLayout>

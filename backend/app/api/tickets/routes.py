@@ -259,10 +259,10 @@ async def reopen_ticket(
     )
     
     # Start background processing for the reopened ticket
-    background_tasks.add_task(process_ticket_async, ticket_id)
+    # background_tasks.add_task(process_ticket_async, ticket_id)
     
     return TicketReopenResponse(
-        message="Ticket reopened successfully and sent for processing",
+        message="Ticket reopened successfully. Send new messages to continue the conversation.",
         ticket_id=ticket_id,
         status=TicketStatus.OPEN.value
     )

@@ -69,6 +69,21 @@ class EnhancedLangGraphWorkflow:
         self.retriever_agent = RetrieverAgent()
         self.escalation_agent = EscalationAgent()
         self.workflow = self._build_workflow()
+        
+    async def _find_available_admin(self, admin_type: str) -> Dict[str, Any]:
+        """
+        Finds an available admin.
+        In a real system, this would check for load, online status, and specialty.
+        For now, it returns the first available admin.
+        """
+        try:
+            # This logic can be expanded to filter by EC/IA roles if they are stored in the user model
+            admins = user_service.get_admins(admin_type=admin_type)
+            print(f"available admins {admins}.")
+            return admins[0] if admins else None
+        except Exception as e:
+            logger.error(f"Error finding admin: {e}")
+            return None
 
     def _build_workflow(self) -> StateGraph:
         """Builds the simplified, more powerful LangGraph workflow."""
@@ -282,10 +297,15 @@ AgentDecision Schema = {{
 
             # Outcome 1: Request more information from the student
             if action == 'request_info' and decision.get('missing_info'):
-                print("Action: Requesting info from student.")
+                print("Action: Requesting info from student.", decision.get("admin_type", "EC"), {state['agent_decision']['admin_type']})
                 message = "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info'])
                 conversation_service.create_conversation(ticket_id, "agent", message, confidence_score=confidence)
-                ticket_service.update_ticket_status(ticket_id, TicketStatus.STUDENT_ACTION_REQUIRED.value)
+                
+                admin = await self._find_available_admin(decision.get("admin_type", "EC"))
+                print(f"admin in request info {admin}.")
+                admin_id = admin["id"] if admin else None
+                print(f"assigning admin in request info {admin_id}.")
+                ticket_service.update_ticket_status(ticket_id, TicketStatus.STUDENT_ACTION_REQUIRED.value, admin_id)
                 state["final_status"] = TicketStatus.STUDENT_ACTION_REQUIRED.value
 
             # Outcome 2: Escalate to a human admin
@@ -299,10 +319,15 @@ AgentDecision Schema = {{
 
             # Outcome 3: Respond to the student and resolve the ticket
             elif action == 'respond' and decision.get('response'):
-                print("Action: Responding and resolving ticket.")
+                print("Action: Responding and resolving ticket.",decision.get("admin_type", "EC"), )
                 response = decision['response']
                 conversation_service.create_conversation(ticket_id, "agent", response, confidence_score=confidence)
-                ticket_service.update_ticket_status(ticket_id, TicketStatus.RESOLVED.value)
+                
+                admin = await self._find_available_admin(decision.get("admin_type", "EC"))
+                print(f"admin in respond {admin}.")
+                admin_id = admin["id"] if admin else None
+                print(f"assigning admin in respond {admin_id}.")
+                ticket_service.update_ticket_status(ticket_id, TicketStatus.RESOLVED.value, admin_id)
                 state["final_status"] = TicketStatus.RESOLVED.value
                 
                 # Cache high-confidence, successful responses
