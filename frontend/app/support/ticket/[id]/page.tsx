@@ -289,72 +289,77 @@ export default function TicketDetailPage() {
           ))}
         </div>
 
-        <div className="mt-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Send a Message
-          </h3>
-          <textarea
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Type your message here..."
-            rows={4}
-          ></textarea>
-          <input
-            type="file"
-            multiple
-            className="mt-3 p-2 border rounded-lg"
-            id="attachment-input"
-          />
-          <Button
-            className="mt-3 bg-blue-600 text-white hover:bg-blue-700"
-            onClick={async () => {
-              const messageInput = document.querySelector("textarea");
-              const attachmentInput = document.getElementById(
-                "attachment-input"
-              ) as HTMLInputElement;
-              const message = messageInput?.value;
-              const attachments = Array.from(attachmentInput?.files || []).map(
-                (file) => file.name
-              ); // Just sending names for now
+        {ticket.ticket.status !== "Resolved" && (
+          <div className="mt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Send a Message
+            </h3>
+            <textarea
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Type your message here..."
+              rows={4}
+            ></textarea>
+            <input
+              type="file"
+              multiple
+              className="mt-3 p-2 border rounded-lg"
+              id="attachment-input"
+            />
+            <Button
+              className="mt-3 bg-blue-600 text-white hover:bg-blue-700"
+              onClick={async () => {
+                const messageInput = document.querySelector("textarea");
+                const attachmentInput = document.getElementById(
+                  "attachment-input"
+                ) as HTMLInputElement;
+                const message = messageInput?.value;
+                const attachments = Array.from(
+                  attachmentInput?.files || []
+                ).map((file) => file.name); // Just sending names for now
 
-              if (message || attachments.length > 0) {
-                try {
-                  const response = await fetch(
-                    `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/messages`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      credentials: "include",
-                      body: JSON.stringify({ message, attachments }),
+                if (message || attachments.length > 0) {
+                  try {
+                    const response = await fetch(
+                      `${process.env.NEXT_PUBLIC_API_BASE}/v1/tickets/${params.id}/messages`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        credentials: "include",
+                        body: JSON.stringify({ message, attachments }),
+                      }
+                    );
+                    if (!response.ok) {
+                      throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                  );
-                  if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const newMessage = await response.json();
+                    setTicket((prevTicket) => {
+                      if (!prevTicket) return null;
+                      return {
+                        ...prevTicket,
+                        conversations: [
+                          ...prevTicket.conversations,
+                          newMessage,
+                        ],
+                      };
+                    });
+                    if (messageInput) {
+                      messageInput.value = ""; // Clear the textarea
+                    }
+                    if (attachmentInput) {
+                      attachmentInput.value = ""; // Clear the file input
+                    }
+                  } catch (error) {
+                    console.error("Failed to send message:", error);
                   }
-                  const newMessage = await response.json();
-                  setTicket((prevTicket) => {
-                    if (!prevTicket) return null;
-                    return {
-                      ...prevTicket,
-                      conversations: [...prevTicket.conversations, newMessage],
-                    };
-                  });
-                  if (messageInput) {
-                    messageInput.value = ""; // Clear the textarea
-                  }
-                  if (attachmentInput) {
-                    attachmentInput.value = ""; // Clear the file input
-                  }
-                } catch (error) {
-                  console.error("Failed to send message:", error);
                 }
-              }
-            }}
-          >
-            Send Message
-          </Button>
-        </div>
+              }}
+            >
+              Send Message
+            </Button>
+          </div>
+        )}
 
         {/* Rating Section */}
         {ticket.ticket.status === "Resolved" && (

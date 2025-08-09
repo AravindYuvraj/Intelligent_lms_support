@@ -43,10 +43,12 @@ def init_database():
         ]
         
         for admin_data in admins:
+            admin_type = "EC" if "ec" in admin_data["email"] else "IA"
             user_service.create_user(
                 email=admin_data["email"],
                 password_hash=get_password_hash(admin_data["password"]),
-                role=UserRole.ADMIN.value
+                role=UserRole.ADMIN.value,
+                user_type=admin_type
             )
         
         logger.info("MongoDB database initialized with sample users")
