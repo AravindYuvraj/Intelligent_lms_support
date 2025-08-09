@@ -156,7 +156,7 @@ class EnhancedLangGraphWorkflow:
         )
         
         if cached_result:
-            print(f"CACHE HIT! Similarity: {cached_result.get('similarity', 'N/A')}")
+            print(f"CACHE HIT! Similarity: {cached_result.get('similarity', 'N/A')},{cached_result['response']} ")
             state["context"] = f"A similar query was resolved in the past.\nCached Response: {cached_result['response']}"
             state["steps_taken"].append("cache_hit")
         else:
@@ -175,11 +175,18 @@ class EnhancedLangGraphWorkflow:
             })
             retrieved_docs = retriever_result.get("retrieved_context", [])
             
+            def sanitize_kb_content(content: str) -> str:
+                # Remove greetings, closings, personal names, phone numbers
+                content = re.sub(r"Dear .*?,", "", content)
+                content = re.sub(r"Thanks.*", "", content, flags=re.IGNORECASE | re.DOTALL)
+                content = re.sub(r"\+?\d[\d -]{8,}", "[REDACTED PHONE]", content)
+                return content.strip()
+            
             if not retrieved_docs:
                 state["context"] = "No relevant documents were found in the knowledge base."
             else:
                 formatted_context = "\n---\n".join([
-                    f"Source: {doc.get('filename', 'N/A')}\nContent: {doc.get('content', '')}"
+                    f"Source: {doc.get('filename', 'N/A')}\nNotes: {sanitize_kb_content(doc.get('content', ''))}"
                     for doc in retrieved_docs
                 ])
                 state["context"] = formatted_context
@@ -194,20 +201,30 @@ class EnhancedLangGraphWorkflow:
 
     async def generate_and_decide(self, state: GraphState) -> GraphState:
         """Generate a response or decide on the next action in a single step."""
-        print(f"GENERATE AND DECIDE for ticket {state['ticket_id']}, {state["messages"]}")
+        print(f"GENERATE AND DECIDE for ticket {state['ticket_id']}, {state['messages']}")
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are 'Masai Agent', an AI support expert for Masai School. Your task is to analyze the user's query and available context to make a single, definitive decision.
+            ("system", """You are 'Masai Agent', an AI support expert for Masai School. 
+Your task is to analyze the user's query and available context to make a single, definitive decision.
+
+IMPORTANT:
+- The KB context contains fragments from past cases.  
+- They may be outdated or irrelevant.  
+- You must synthesize a **new** answer in your own words.  
+- Direct reuse of sentences, greetings, names, or structure is prohibited.  
+- If your answer is more than 50% similar to the KB snippet, it will be rejected.
+- Your tone must remain polite, supportive, and consistent with Masai’s style.
+
 
 **Decision Logic:**
-1.  **Classify Team:** First, determine if the query is for **EC (Experience Champion)** or **IA (Instructor Associate)**.
-    * **EC:** Logistics, attendance, leave, evaluations, placements, finances (ISA/NBFC), non-technical queries.
-    * **IA:** Technical issues, coding, DSA, code reviews, academic doubts.
+1. **Classify Team:** First, determine if the query is for **EC (Experience Champion)** or **IA (Instructor Associate)**.
+   * EC: Logistics, attendance, leave, evaluations, placements, finances (ISA/NBFC), non-technical queries.
+   * IA: Technical issues, coding, DSA, code reviews, academic doubts.
 
-2.  **Choose One Action:**
-    a. **REQUEST INFO:** If the query lacks specific details needed for a full answer (e.g., missing dates, specifics of a bug), choose this. You MUST list the needed info in `missing_info`.
-    b. **ESCALATE:** If the query is too complex, sensitive, or requires a manual action you can't perform (e.g., "the video link is broken"), choose this. You MUST provide a clear `escalation_reason`.
-    c. **RESPOND:** If you have enough context to fully and accurately answer, choose this. You MUST generate a helpful and complete `response`.
+2. **Choose One Action:**
+   a. **REQUEST INFO:** If the query lacks specific details needed for a full answer (e.g., missing dates, specifics of a bug), choose this. You MUST list the needed info in `missing_info`.
+   b. **ESCALATE:** If the query is too complex, sensitive, or requires a manual action you can't perform, choose this. You MUST provide a clear `escalation_reason`.
+   c. **RESPOND:** If you have enough context to fully and accurately answer, choose this. You MUST generate a helpful and complete `response` in your own words.
 
 **Output Format:**
 Respond ONLY with 1 valid JSON object matching the `AgentDecision` schema as follows. Do not add explanations or markdown or any Markdown fences (```json ...``` or ```).
@@ -215,23 +232,31 @@ IMPORTANT: Output must be exactly one JSON object.
 Do not repeat the JSON object or KEY - VALUES in the object. 
 Do not output multiple decision objects. 
 If you output anything else, it will cause a system error.
-
-AgentDecision Schema = {{
+{{
   "decision": "respond" | "request_info" | "escalate",
-  "response": "Your generated response here. Null if not applicable.",
+  "response": "Your generated response here. Null if not applicable.", // Must be rewritten in your own words, no direct copy from KB, Start the response with a sweet message like "Dear student,
+Thank you for reaching out to us. Supporting our students is our highest priority. 😊
+" and end it with "Thanks and Regards.". DO NOT INCLUDE personal details of any person like name, contact, etc.
   "missing_info": ["List of questions or items needed. Null if not applicable."],
   "escalation_reason": "Reason for escalation. Null if not applicable.",
   "admin_type": "EC" | "IA",
   "confidence": "Your confidence score in the range [0.0, 1.0]. Must be a float."
-}}"""),
-
+}}
+"""),
             MessagesPlaceholder(variable_name="messages"),
-            ("human", """Here is the data. Make your decision.
-**Available Knowledge Base Context (Previously resolved tickets for reference / Program and Curriculum details):**
+            ("human", """I am giving you knowledge base context and user query to help you make a decision. You may refer to the knowledge base context for facts, dates, and procedures.
+             Also you may understand Masai's style from it and generate your response similarly.
+             DO NOT USE IT VERBATIM. Must be rewritten in your own words.
+             Knowledge base context may be of 2 types:
+             1. Previously resolved tickets for reference - DO NOT COPY THE CONTENT, consider that the information might be old and currently irrelevant. Generate your decision and response accordingly
+             2. Program and Curriculum details - for course related queries, you can use this information to generate your response.
+**Available Knowledge Base Context :**
 {context}
 
 **Current User Query:**
 {query}
+
+Make your decision.
 """)
         ])
         
@@ -312,7 +337,8 @@ AgentDecision Schema = {{
                 print(f"Action: Escalating to human admin ({decision.get('admin_type')}).")
                 # The escalation agent assigns the ticket, sets status, and creates the conversation
                 await self.escalation_agent.process({
-                    "ticket_id": ticket_id, "admin_type": decision.get("admin_type", "EC")
+                    "ticket_id": ticket_id, "admin_type": decision.get("admin_type", "EC"),
+                    "response": decision.get("response", "")
                 })
                 state["final_status"] = TicketStatus.ADMIN_ACTION_REQUIRED.value
 
@@ -330,7 +356,7 @@ AgentDecision Schema = {{
                 state["final_status"] = TicketStatus.RESOLVED.value
                 
                 # Cache high-confidence, successful responses
-                if confidence >= 0.85:
+                if confidence >= 0.85 and 'A similar query was resolved in the past' not in state["context"]:
                     await self.cache_service.store_response(state["original_query"], response, confidence, state["category"])
                     print("Stored successful response in cache.")
             

@@ -17,8 +17,8 @@ class EscalationAgent:
         try:
             ticket_id = state["ticket_id"]
             admin_type = state.get("admin_type", "EC")  # Default to EC if not specified
-            
-            logger.info(f"Escalating ticket {ticket_id} to an {admin_type} admin.")
+
+            print(f"Escalating ticket {ticket_id} to an {admin_type} admin.")
 
             # 1. Find an available admin of the specified type
             admin = await self._find_available_admin(admin_type)
@@ -32,9 +32,8 @@ class EscalationAgent:
             )
 
             # 3. Create a predefined message for the student
-            student_message = (
-                "Thank you for contacting support. Your query has been forwarded to your {admin_type}. They will review your request and get back to you soon with a detailed response."
-            )
+            student_message = state.get("response", f"Thank you for contacting support. Your query has been forwarded to your {admin_type}. They will review your request and get back to you soon with a detailed response.")
+
             conversation_service.create_conversation(
                 ticket_id=ticket_id,
                 sender_role="agent",
