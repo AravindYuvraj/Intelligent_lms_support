@@ -61,6 +61,25 @@ class RetrieverAgent:
                 categories=[kb_category],
                 top_k=5
             )
+            
+            high_score_results = [r for r in search_results if r.get("score", 0) >= 0.8]
+
+            if len(high_score_results) < 5 and kb_category != 'qa_documents':
+                # Filter out low-score results from main search
+                search_results = high_score_results
+
+                # Search in 'qa_documents'
+                extra_results = await self.document_service.search_documents(
+                    query=query,
+                    categories=['qa_documents'],
+                    top_k=5
+                )
+
+                # Keep only high-score extra results
+                extra_results = [r for r in extra_results if r.get("score", 0) >= 0.8]
+
+                # Merge results without duplicates
+                search_results.extend(r for r in extra_results if r not in search_results)
 
             print(f"Raw search results: {len(search_results)} documents found")
             if search_results:
