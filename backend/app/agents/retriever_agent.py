@@ -26,6 +26,7 @@ class RetrieverAgent:
             print(f"Failed to initialize DocumentService: {e}")
             self.document_service = None
 
+
     async def process(self, state: AgentState) -> AgentState:
         """
         Processes the user query to retrieve relevant context from the knowledge base.
@@ -42,7 +43,7 @@ class RetrieverAgent:
             if not self.document_service:
                 raise Exception("DocumentService not initialized")
             
-            # 1. Map the incoming ticket category to a knowledge base category.
+            # 1. Map the incoming ticket category...
             kb_category = self._get_kb_category(category)
             
             if not kb_category:
@@ -58,38 +59,57 @@ class RetrieverAgent:
             search_results = await self.document_service.search_documents(
                 query=query,
                 categories=[kb_category],
-                top_k=10
+                top_k=5
             )
 
             print(f"Raw search results: {len(search_results)} documents found")
             if search_results:
                 for i, result in enumerate(search_results[:3]):  # Log first 3 results
                     score = result.get("score", 0)
-                    content_preview = result.get("content", "")[:200]
+                    # FIX: Use 'text_snippet' here for the preview
+                    content_preview = result.get("text_snippet", "")[:100]
                     filename = result.get("filename", "unknown")
                     print(f"i, result", i, result)
                     print(f"Result {i+1}: score={score:.3f}, file='{filename}', content='{content_preview}...'")
 
             # 3. Process and re-rank the results
             reranked_chunks = await self._rerank_chunks(search_results, query)
-            
-            # 4. Update the state with the top 5 most relevant chunks.
-            top_chunks = reranked_chunks[:5]
-            state["retrieved_context"] = top_chunks
+            top_results = reranked_chunks[:5]
+                
+            # 4. Format the final context, giving priority to Q&A pairs
+            final_context = []
+            for result in top_results:
+                potential_response = result.get("potential_response")
+                
+                # If a pre-canned answer exists, format it clearly for the LLM
+                if potential_response:
+                    result['content'] = (
+                        f"A relevant Q&A pair was found in the knowledge base.\n"
+                        f"Question: {result.get('text_snippet', '')}\n"
+                        f"Answer: {potential_response}"
+                    )
+                else:
+                    # For regular documents, the content is just the text snippet
+                    result['content'] = result.get('text_snippet', '')
+                    
+                final_context.append(result)
+
+            # 5. Update the state with the fully prepared context
+            state["retrieved_context"] = final_context
             state["current_step"] = WorkflowStep.RESPONSE_GENERATION.value
-            
-            context_count = len(top_chunks)
+                    
+            context_count = len(final_context)
             if context_count == 0:
                 print(f" NO RELEVANT CONTEXT found for ticket {ticket_id}")
             else:
                 print(f"SELECTED {context_count} top chunks for context")
                 # Log the best chunk
-                if top_chunks:
-                    best_chunk = top_chunks[0]
-                    print(f"Best chunk: score={best_chunk.get('score', 0):.3f}, content='{best_chunk.get('content', '')[:200]}...'")
-            
+                if final_context:
+                    best_chunk = final_context[0]
+                    print(f"Best chunk: score={best_chunk.get('score', 0):.3f}, content='{best_chunk.get('content', '')[:100]}...'")
+
             return state
-            
+                
         except Exception as e:
             print(f"RETRIEVER AGENT ERROR for ticket {ticket_id}: ",e)
             state["error_message"] = f"Context retrieval failed: {str(e)}"

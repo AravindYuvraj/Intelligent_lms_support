@@ -128,6 +128,63 @@ class DocumentService:
             logger.warning(f"No Pinecone index configured for category '{category}'. Skipping operation.")
         return index
 
+    async def _process_and_store_excel(self, file_content: bytes, filename: str, doc_id: str, category: str) -> Dict[str, Any]:
+        """
+        Processes a Q&A Excel file row by row, embedding the 'message'
+        and storing the 'Potential response' in the vector's metadata.
+        """
+        print("--- Processing file using dedicated Excel Q&A logic ---")
+        try:
+            # 1. Read the Excel file into a pandas DataFrame
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
+                temp_file.write(file_content)
+                temp_path = temp_file.name
+            
+            df = await run_in_threadpool(pd.read_excel, temp_path)
+            os.unlink(temp_path) # Clean up the temporary file
+
+            # 2. Validate and prepare data
+            if "message" not in df.columns or "Potential response" not in df.columns:
+                raise ValueError("Excel file must contain 'message' and 'Potential response' columns.")
+            
+            df = df[["message", "Potential response"]].dropna().reset_index()
+            if df.empty:
+                raise ValueError("No valid rows found in the Excel file.")
+
+            # 3. Embed all 'message' columns in a single batch
+            messages_to_embed = df["message"].tolist()
+            embeddings = await self.embeddings.aembed_documents(messages_to_embed)
+
+            # 4. Prepare vectors with 'Potential response' in metadata
+            vectors = []
+            for index, row in df.iterrows():
+                vector = {
+                    "id": f"{doc_id}_row_{index}",
+                    "values": embeddings[index],
+                    "metadata": {
+                        "doc_id": doc_id,
+                        "category": category,
+                        "filename": filename,
+                        "text_snippet": row["message"],          # The question
+                        "potential_response": row["Potential response"]  # The answer
+                    }
+                }
+                vectors.append(vector)
+
+            # 5. Store vectors in the correct Pinecone index
+            index = self._get_index(category)
+            if index:
+                for i in range(0, len(vectors), 100): # Upsert in batches
+                    batch = vectors[i:i + 100]
+                    await run_in_threadpool(index.upsert, vectors=batch)
+                logger.info(f"Stored {len(vectors)} Q&A pairs in Pinecone for doc {doc_id}")
+
+            return {"document_id": doc_id, "items_created": len(vectors)}
+
+        except Exception as e:
+            logger.error(f"Excel processing error for '{filename}': {e}", exc_info=True)
+            raise e
+    
     async def upload_document(self, file: UploadFile, category: str) -> Dict[str, Any]:
         """Upload, process, and index a document into its specified category index."""
         if category not in self.collection_map:
@@ -136,6 +193,20 @@ class DocumentService:
         try:
             doc_id = str(uuid.uuid4())
             content = await file.read()
+
+            # --- NEW LOGIC BLOCK ---
+            # Check if the file is an Excel file to route it to the special processor
+            mime_type, _ = mimetypes.guess_type(file.filename)
+            is_excel = mime_type in [
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ] or file.filename.endswith(('.xlsx', '.xls'))
+
+            if is_excel:
+                # If it's Excel, use the dedicated Q&A processing method and return
+                return await self._process_and_store_excel(content, file.filename, doc_id, category)
+            # --- END OF NEW LOGIC BLOCK ---
+
             mime_type, _ = mimetypes.guess_type(file.filename)
             mime_type = mime_type or file.content_type or 'application/octet-stream'
 
@@ -164,7 +235,7 @@ class DocumentService:
                 await self._store_in_pinecone(index, doc_id, chunks, category, file.filename)
             
             logger.info(f"Document uploaded to category '{category}': {file.filename}")
-            return {"document_id": doc_id, "chunks_created": len(chunks)}
+            return {"document_id": doc_id, "items_created": len(chunks)}
             
         except Exception as e:
             print(f"Upload error for '{file.filename}': ",e)
@@ -312,7 +383,8 @@ class DocumentService:
                     "category": metadata.get('category'),
                     "filename": metadata.get('filename'),
                     "doc_id": metadata.get('doc_id'),
-                    "text_snippet": metadata.get('text_snippet')
+                    "text_snippet": metadata.get('text_snippet'),
+                    "potential_response": metadata.get('potential_response')
                 })
             
             return final_results
@@ -372,22 +444,6 @@ class DocumentService:
                 logger.error(f"Fallback PDF loader also failed: {e2}")
                 raise e2
 
-    async def _extract_from_excel(self, file_path: str) -> str:
-        try:
-            if file_path.endswith('.csv'):
-                df = await run_in_threadpool(pd.read_csv, file_path)
-                return await run_in_threadpool(df.to_string, index=False)
-            else:
-                # Reading all sheets
-                all_sheets = await run_in_threadpool(pd.read_excel, file_path, sheet_name=None)
-                text_content = []
-                for sheet_name, df in all_sheets.items():
-                    text_content.append(f"--- Sheet: {sheet_name} ---\n{df.to_string(index=False)}")
-                return "\n\n".join(text_content)
-        except Exception as e:
-            logger.error(f"Excel extraction error: {e}")
-            raise e
-
     async def _extract_from_word(self, file_path: str) -> str:
         if not Document:
             raise ImportError("Word processing library not installed. Please run 'pip install python-docx'.")
@@ -439,32 +495,6 @@ class DocumentService:
                 continue
         raise ValueError("Could not decode text file with common encodings.")
 
-    
-            
-    async def delete_document(self, doc_id: str):
-        """Deletes a document from MongoDB and its associated vectors from Pinecone."""
-        try:
-            # 1. Delete from MongoDB
-            deleted_in_mongo = False
-            for collection_name in self.valid_categories.values():
-                collection = self.mongodb[collection_name]
-                result = await run_in_threadpool(collection.delete_one, {"doc_id": doc_id})
-                if result.deleted_count > 0:
-                    deleted_in_mongo = True
-                    break
-            
-            if not deleted_in_mongo:
-                raise ValueError(f"Document {doc_id} not found in MongoDB.")
-
-            # 2. Delete from Pinecone using a metadata filter (more efficient)
-            if self.index:
-                await run_in_threadpool(self.index.delete, filter={"doc_id": doc_id})
-
-            logger.info(f"Document {doc_id} and its vectors deleted successfully.")
-
-        except Exception as e:
-            logger.error(f"Document deletion error for {doc_id}: {e}")
-            raise e
 
     async def list_documents(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lists document metadata from MongoDB."""
@@ -479,7 +509,8 @@ class DocumentService:
         for collection_name in collections_to_search:
             collection = self.mongodb[collection_name]
             # Use run_in_threadpool for the blocking cursor iteration
-            async for doc in run_in_threadpool(collection.find, {}, {"content": 0}):
+            cursor = await run_in_threadpool(collection.find, {})
+            for doc in cursor:
                 doc["_id"] = str(doc["_id"])
                 documents.append(doc)
         
