@@ -62,7 +62,6 @@ const categoryGuides: CategoryGuide[] = [
       { name: "Evaluation Score" },
       { name: "MAC", description: "Masai Additional Curriculum" },
       { name: "Revision", description: "Course content revision" },
-      { name: "IA Support", description: "Technical support from IA" },
     ],
   },
   {
@@ -79,6 +78,7 @@ const categoryGuides: CategoryGuide[] = [
       { name: "Offer Stage- Placements" },
       { name: "ISA/EMI/NBFC/Glide Related - Placements" },
       { name: "Session Support - Placement" },
+      { name: "IA Support", description: "Technical support from IA" },
     ],
   },
 ];

@@ -16,6 +16,9 @@ langchain-community==0.3.7
 langchain-google-genai==2.0.4
 langgraph==0.2.34
 langsmith==0.1.137
+langchain_huggingface==0.1.0
+sentence-transformers==3.0.1
+
 
 # Vector Database
 pinecone-client==5.0.1

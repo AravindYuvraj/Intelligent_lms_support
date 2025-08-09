@@ -9,7 +9,7 @@ import logging
 import tempfile
 import mimetypes
 from typing import List, Dict, Any, Optional
-
+import time
 # Third-party imports
 import pandas as pd
 from fastapi import UploadFile
@@ -17,6 +17,7 @@ from pymongo import MongoClient
 from pinecone import Pinecone, Index
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # Import parsers and handle potential ImportErrors
 try:
@@ -90,9 +91,10 @@ class DocumentService:
     def __init__(self):
         self.mongodb = get_mongodb()
         self.gridfs = gridfs.GridFS(self.mongodb)
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=settings.GOOGLE_API_KEY
+        self.embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-mpnet-base-v2", 
+        model_kwargs={"device": "cpu"}, 
+        encode_kwargs={"normalize_embeddings": True}
         )
 
         # --- Refactor for Multi-Index Support ---
@@ -165,13 +167,26 @@ class DocumentService:
             return {"document_id": doc_id, "chunks_created": len(chunks)}
             
         except Exception as e:
-            logger.error(f"Upload error for '{file.filename}': {e}", exc_info=True)
+            print(f"Upload error for '{file.filename}': ",e)
             raise e
 
     async def _store_in_pinecone(self, index: Index, doc_id: str, chunks: List[str], category: str, filename: str):
         """Asynchronously embed and store document chunks in a specific Pinecone index."""
         try:
-            embeddings = await self.embeddings.aembed_documents(chunks)
+            retries = 3
+            backoff_time = 1
+            for i in range(retries):
+                try:
+                    embeddings = await self.embeddings.aembed_query(chunks)
+                    break
+                except Exception as e:
+                    if "504 Deadline Exceeded" in str(e) and i < retries - 1:
+                        print(f"Embedding failed: {e}. Retrying in {backoff_time} seconds...")
+                        time.sleep(backoff_time)
+                        backoff_time *= 2  # Exponential backoff
+                    else:
+                        print(f"Embedding failed after {i + 1} attempts: {e}")
+                        raise # Re-raise the exception if all retries fail
             vectors = [
                 {"id": f"{doc_id}_chunk_{i}", "values": embedding,
                  "metadata": {"doc_id": doc_id, "category": category, "filename": filename, "text_snippet": chunk[:500]}}
@@ -232,6 +247,10 @@ class DocumentService:
         if not self.pinecone:
             logger.warning("Pinecone is not configured. Cannot perform search.")
             return []
+        
+        print("--- DOCUMENT SERVICE DEBUG ---")
+        print(f"Received categories for search: {categories}")
+        print(f"Available Pinecone index keys in service: {list(self.pinecone_indices.keys())}")
 
         # Determine which indices to search
         indices_to_search = {}
@@ -248,7 +267,21 @@ class DocumentService:
 
         try:
             # 1. Generate a single embedding for the query
-            query_embedding = await self.embeddings.aembed_query(query)
+            retries = 3
+            backoff_time = 1
+            for i in range(retries):
+                try:
+                    query_embedding = await self.embeddings.aembed_query(query)
+                    break
+                except Exception as e:
+                    if "504 Deadline Exceeded" in str(e) and i < retries - 1:
+                        print(f"Embedding failed: {e}. Retrying in {backoff_time} seconds...")
+                        time.sleep(backoff_time)
+                        backoff_time *= 2  # Exponential backoff
+                    else:
+                        print(f"Embedding failed after {i + 1} attempts: {e}")
+                        raise # Re-raise the exception if all retries fail
+            print(f"Generated embedding vector of length: {len(query_embedding)} in document service")
 
             # 2. Asynchronously query all specified indices in parallel
             async def query_index(index: Index):

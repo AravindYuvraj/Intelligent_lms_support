@@ -65,8 +65,9 @@ class RetrieverAgent:
             if search_results:
                 for i, result in enumerate(search_results[:3]):  # Log first 3 results
                     score = result.get("score", 0)
-                    content_preview = result.get("content", "")[:100]
+                    content_preview = result.get("content", "")[:200]
                     filename = result.get("filename", "unknown")
+                    print(f"i, result", i, result)
                     print(f"Result {i+1}: score={score:.3f}, file='{filename}', content='{content_preview}...'")
 
             # 3. Process and re-rank the results
@@ -85,12 +86,12 @@ class RetrieverAgent:
                 # Log the best chunk
                 if top_chunks:
                     best_chunk = top_chunks[0]
-                    print(f"Best chunk: score={best_chunk.get('score', 0):.3f}, content='{best_chunk.get('content', '')[:100]}...'")
+                    print(f"Best chunk: score={best_chunk.get('score', 0):.3f}, content='{best_chunk.get('content', '')[:200]}...'")
             
             return state
             
         except Exception as e:
-            print(f"RETRIEVER AGENT ERROR for ticket {ticket_id}: {e}", exc_info=True)
+            print(f"RETRIEVER AGENT ERROR for ticket {ticket_id}: ",e)
             state["error_message"] = f"Context retrieval failed: {str(e)}"
             state["requires_escalation"] = True
             state["current_step"] = WorkflowStep.ESCALATION.value
@@ -120,7 +121,6 @@ class RetrieverAgent:
             "Evaluation Score": "curriculum_documents",
             "MAC": "curriculum_documents",
             "Revision": "curriculum_documents",
-            "IA Support": "curriculum_documents",
             
             # General support, FAQs, troubleshooting -> qa_documents
             "Product Support": "qa_documents",
@@ -133,6 +133,7 @@ class RetrieverAgent:
             "Offer Stage- Placements": "qa_documents", 
             "ISA/EMI/NBFC/Glide Related - Placements": "qa_documents",
             "Session Support - Placement": "qa_documents",
+            "IA Support": "qa_documents",
         }
         
         mapped_category = category_mapping.get(ticket_category)
@@ -171,35 +172,3 @@ class RetrieverAgent:
             print(f"Reranking failed: {e}, returning original order")
             return chunks
     
-    def get_supported_categories(self) -> List[str]:
-        """Return list of supported knowledge base categories"""
-        return [
-            "program_details_documents",
-            "curriculum_documents", 
-            "qa_documents"
-        ]
-    
-    def get_category_mapping(self) -> Dict[str, str]:
-        """Return the complete category mapping for debugging"""
-        return {
-            "Course Query": "program_details_documents",
-            "Attendance/Counselling Support": "program_details_documents", 
-            "Leave": "program_details_documents",
-            "Late Evaluation Submission": "program_details_documents",
-            "Missed Evaluation Submission": "program_details_documents",
-            "Withdrawal": "program_details_documents",
-            "Evaluation Score": "curriculum_documents",
-            "Code Review": "curriculum_documents",
-            "MAC": "curriculum_documents",
-            "Revision": "curriculum_documents",
-            "IA Support": "curriculum_documents",
-            "Product Support": "qa_documents",
-            "NBFC/ISA": "qa_documents",
-            "Feedback": "qa_documents",
-            "Referral": "qa_documents",
-            "Personal Query": "qa_documents",
-            "Placement Support - Placements": "qa_documents",
-            "Offer Stage- Placements": "qa_documents", 
-            "ISA/EMI/NBFC/Glide Related - Placements": "qa_documents",
-            "Session Support - Placement": "qa_documents",
-        }
