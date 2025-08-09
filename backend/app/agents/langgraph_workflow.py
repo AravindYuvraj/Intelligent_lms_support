@@ -20,6 +20,7 @@ from .retriever_agent import RetrieverAgent
 from .escalation_agent import EscalationAgent
 import traceback
 import re
+from typing_extensions import Literal, Annotated
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,9 @@ class GraphState(TypedDict):
     user_id: str
     original_query: str
     category: str
+
+    rewritten_query: Optional[str]
+
     
     # Workflow tracking
     messages: Annotated[List, add_messages]
@@ -47,12 +51,17 @@ class GraphState(TypedDict):
 
 class AgentDecision(BaseModel):
     """Structured output for the agent's decision-making process."""
-    decision: str = Field(description="The final decision. Must be one of: 'respond', 'request_info', 'escalate'.")
+    decision: Literal['respond', 'request_info', 'escalate'] = Field(description="The final decision. Must be one of: 'respond', 'request_info', 'escalate'.")
     response: Optional[str] = Field(default=None, description="The generated response for the student if the decision is 'respond'.")
     missing_info: Optional[List[str]] = Field(default=None, description="A list of specific information required from the student if the decision is 'request_info'.")
     escalation_reason: Optional[str] = Field(default=None, description="A brief reason for escalation if the decision is 'escalate'.")
-    admin_type: str = Field(description="The team responsible for the query. Must be 'EC' or 'IA'.")
+    admin_type: Literal['EC', 'IA']  = Field(description="The team responsible for the query. Must be 'EC' or 'IA'.")
     confidence: float = Field(description="Confidence score (0.0 to 1.0) in the decision.")
+
+class RewrittenQuery(BaseModel):
+    """Structured output for the query rewriting step."""
+    rewritten_query: str = Field(description="A single, optimized search query tailored for a specific knowledge base.")
+
 
 class EnhancedLangGraphWorkflow:
     """Production-ready LangGraph workflow with a central decision-making agent."""
@@ -84,6 +93,56 @@ class EnhancedLangGraphWorkflow:
         except Exception as e:
             logger.error(f"Error finding admin: {e}")
             return None
+        
+    def _get_kb_category(self, ticket_category: Optional[str]) -> Optional[str]:
+        """
+        Maps an incoming ticket category to one of the three main knowledge base categories.
+        
+        Returns the name of the knowledge base category (e.g., "program_details_documents").
+        """
+        if not ticket_category:
+            print("No category provided, defaulting to qa_documents")
+            return "qa_documents"
+
+        # Enhanced mapping with more detailed logging
+        category_mapping = {
+            # Program and administrative related -> Program Details
+            "Course Query": "program_details_documents",
+            "Attendance/Counselling Support": "program_details_documents", 
+            "Leave": "program_details_documents",
+            "Late Evaluation Submission": "program_details_documents",
+            "Missed Evaluation Submission": "program_details_documents",
+            "Withdrawal": "program_details_documents",
+            
+            # Technical and curriculum related -> Curriculum Documents
+            "Evaluation Score": "curriculum_documents",
+            "MAC": "curriculum_documents",
+            "Revision": "curriculum_documents",
+            
+            # General support, FAQs, troubleshooting -> qa_documents
+            "Product Support": "qa_documents",
+            "NBFC/ISA": "qa_documents",
+            "Feedback": "qa_documents",
+            "Referral": "qa_documents",
+            "Personal Query": "qa_documents",
+            "Code Review": "qa_documents",
+            "Placement Support - Placements": "qa_documents",
+            "Offer Stage- Placements": "qa_documents", 
+            "ISA/EMI/NBFC/Glide Related - Placements": "qa_documents",
+            "Session Support - Placement": "qa_documents",
+            "IA Support": "qa_documents",
+        }
+        
+        mapped_category = category_mapping.get(ticket_category)
+        
+        if mapped_category:
+            print(f"CATEGORY MAPPING: '{ticket_category}' -> '{mapped_category}'")
+        else:
+            print(f" UNMAPPED CATEGORY: '{ticket_category}', defaulting to 'qa_documents'")
+            mapped_category = "qa_documents"
+        
+        return mapped_category
+
 
     def _build_workflow(self) -> StateGraph:
         """Builds the simplified, more powerful LangGraph workflow."""
@@ -96,19 +155,23 @@ class EnhancedLangGraphWorkflow:
         workflow.add_node("retrieve_context", self.retrieve_context)
         workflow.add_node("generate_and_decide", self.generate_and_decide)
         workflow.add_node("finalize_and_act", self.finalize_and_act)
+        workflow.add_node("rewrite_query_for_retrieval", self.rewrite_query_for_retrieval) 
         
         # Define the graph structure
         workflow.set_entry_point("initialize")
         workflow.add_edge("initialize", "check_cache")
         
+        # --- MODIFIED FOR QUERY REWRITING ---
         workflow.add_conditional_edges(
             "check_cache",
-            lambda state: "retrieve_context" if state.get("context") is None else "generate_and_decide",
+            # On cache miss, go to rewrite. On hit, go to decide.
+            lambda state: "rewrite_query_for_retrieval" if state.get("context") is None else "generate_and_decide",
             {
-                "retrieve_context": "retrieve_context",
+                "rewrite_query_for_retrieval": "rewrite_query_for_retrieval",
                 "generate_and_decide": "generate_and_decide"
             }
         )
+        workflow.add_edge("rewrite_query_for_retrieval", "retrieve_context")
         
         workflow.add_edge("retrieve_context", "generate_and_decide")
         workflow.add_edge("generate_and_decide", "finalize_and_act")
@@ -120,11 +183,14 @@ class EnhancedLangGraphWorkflow:
         """Initialize the workflow state with ticket information."""
         print(f"INITIALIZING STATE for ticket {state['ticket_id']}")
         try:
-            ticket = ticket_service.get_ticket_by_id(state["ticket_id"])
+            # Run blocking calls in a separate thread
+            ticket = await asyncio.to_thread(
+                ticket_service.get_ticket_by_id, state["ticket_id"]
+            )
             if not ticket:
                 raise ValueError(f"Ticket {state['ticket_id']} not found")
 
-            conversations = conversation_service.get_ticket_conversations(state["ticket_id"])
+            conversations = await asyncio.to_thread(conversation_service.get_ticket_conversations, state["ticket_id"])
             
             messages = []
             for conv in conversations:
@@ -133,12 +199,12 @@ class EnhancedLangGraphWorkflow:
                 else:
                     # Assuming 'agent' or 'support' roles are the AI
                     messages.append(AIMessage(content=conv["message"]))
-            
+            print("Updating state category", ticket["category"])
             state.update({
                 "user_id": str(ticket["user_id"]),
                 "original_query": conversations[-1]['message'], # The latest message is the current query
                 "category": ticket["category"],
-                "messages": [HumanMessage(content=conversations[-1]['message'])],
+                "messages": messages,
                 "steps_taken": ["initialize"]
             })
             print(f"INITIALIZED STATE: category={state['category']}, query='{state['original_query'][:50]}...'")
@@ -165,13 +231,74 @@ class EnhancedLangGraphWorkflow:
             state["steps_taken"].append("cache_miss")
         return state
 
+    # --- NEW NODE FOR CONDITIONAL QUERY REWRITING ---
+    async def rewrite_query_for_retrieval(self, state: GraphState) -> GraphState:
+        """Conditionally rewrites the query for specific categories to improve retrieval."""
+        print("EVALUATING QUERY FOR REWRITING", state["category"])
+        category = state["category"]
+        original_query = state["original_query"]
+
+        kb_category = self._get_kb_category(category)
+
+        # Only rewrite for the specified categories
+        if kb_category not in ["curriculum_documents", "program_details_documents"]:
+            print(f"Category '{kb_category}' does not require query rewriting. Using original query.")
+            state["rewritten_query"] = original_query
+            state["steps_taken"].append("rewrite_skipped")
+            return state
+
+        print(f"REWRITING QUERY for category: {category}")
+
+        if kb_category == "curriculum_documents":
+            prompt_text = """You are an expert search query creator. Your task is to rewrite a user's question into a highly effective search query optimized for a technical curriculum knowledge base.
+            Focus on extracting key technical terms, programming concepts, library names, or algorithm names. The query should be concise and keyword-driven.
+            
+            User question: {query}
+            
+            Respond with a single, optimized 
+         query."""
+        else: # program_details_documents
+            prompt_text = """You are an expert search query creator. Your task is to rewrite a user's question into a highly effective search query optimized for a program policy and timeline knowledge base.
+            Focus on extracting keywords related to deadlines, deliverables, policies (like attendance, leave), program phases, or specific event names.
+            
+            User question: {query}
+            
+            Respond with a single, optimized search query."""
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", prompt_text),
+            ("human", "Rewrite the following user question: {query}")
+        ])
+        
+        rewriter_chain = prompt | self.llm.with_structured_output(RewrittenQuery)
+
+        try:
+            result = await rewriter_chain.ainvoke({"query": original_query})
+            rewritten = result.rewritten_query
+            print(f"Original Query: '{original_query}'")
+            print(f"Rewritten Query: '{rewritten}'")
+            state["rewritten_query"] = rewritten
+            state["steps_taken"].append("query_rewritten")
+            print(f"Query successfully rewritten for category:", state["rewritten_query"])
+        except Exception as e:
+            print(f"REWRITING ERROR: {e}. Falling back to original query.")
+            state["rewritten_query"] = original_query
+            state["error_message"
+                  ] = f"Query rewriting failed: {e}"
+
+        return state
+
+
     async def retrieve_context(self, state: GraphState) -> GraphState:
         """Retrieve context using the RetrieverAgent on cache miss."""
         print(f"RETRIEVING CONTEXT for ticket {state['ticket_id']}")
         try:
+            print(f"retreive context: {state.get('category')}")
             retriever_result = await self.retriever_agent.process({
-                "query": state["original_query"],
-                "category": state["category"]
+                "original_query": state["original_query"],
+                "category": state["category"],
+                "ticket_id": state["ticket_id"],
+                "rewritten_query": state.get("rewritten_query", state["original_query"])
             })
             retrieved_docs = retriever_result.get("retrieved_context", [])
             
@@ -222,9 +349,9 @@ IMPORTANT:
    * IA: Technical issues, coding, DSA, code reviews, academic doubts.
 
 2. **Choose One Action:**
-   a. **REQUEST INFO:** If the query lacks specific details needed for a full answer (e.g., missing dates, specifics of a bug), choose this. You MUST list the needed info in `missing_info`.
-   b. **ESCALATE:** If the query is too complex, sensitive, or requires a manual action you can't perform, choose this. You MUST provide a clear `escalation_reason`.
-   c. **RESPOND:** If you have enough context to fully and accurately answer, choose this. You MUST generate a helpful and complete `response` in your own words.
+   a. **request_info:** If the query lacks specific details needed for a full answer (e.g., missing dates, specifics of a bug), choose this. You MUST list the needed info in `missing_info`.
+   b. **escalate:** If the query is too complex, sensitive, or requires a manual action you can't perform, choose this. You MUST provide a clear `escalation_reason`.
+   c. **respond:** If you have enough context to fully and accurately answer, choose this. You MUST generate a helpful and complete `response` in your own words.
 
 **Output Format:**
 Respond ONLY with 1 valid JSON object matching the `AgentDecision` schema as follows. Do not add explanations or markdown or any Markdown fences (```json ...``` or ```).
@@ -322,7 +449,7 @@ Make your decision.
             # Outcome 1: Request more information from the student
             if action == 'request_info' and decision.get('missing_info'):
                 print("Action: Requesting info from student.", decision.get("admin_type", "EC"), {state['agent_decision']['admin_type']})
-                message = "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info'])
+                message = decision.get('response', "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info']))
                 conversation_service.create_conversation(ticket_id, "agent", message, confidence_score=confidence)
                 
                 admin = await self._find_available_admin(decision.get("admin_type", "EC"))
