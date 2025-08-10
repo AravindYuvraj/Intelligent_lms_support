@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # --- Database Configuration ---
     MONGODB_URL: str
     REDIS_URL: str
+    REDIS_TOKEN: str
     
     # --- Google AI Configuration ---
     GOOGLE_API_KEY: str

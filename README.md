@@ -43,43 +43,97 @@ This is a production-ready AI-powered support system for Masai School's LMS that
 
 ## 🏗️ System Architecture
 
-### Enhanced LangGraph Workflow
+This project leverages a multi-agentic RAG (Retrieval-Augmented Generation) architecture orchestrated by LangGraph to efficiently handle student queries and automate ticket resolution. The system features distinct user roles for students and admins (EC/IA), each with a dedicated set of functionalities.
+
+### Overall Architecture Flow
+
+```mermaid
+graph TD
+    A[Student Query] --> B{Routing Agent}
+    B --> C{Cache Check (Redis)}
+    C -- Cache Hit --> D[Personalize Response (LLM)]
+    D --> E[Response to Student]
+    C -- Cache Miss --> F{Query Decomposition}
+    F --> G{Triage (EC/IA)}
+    G --> H{Retriever Agent}
+    H --> I{Pinecone Vector DB}
+    I --> J{Re-ranking}
+    J --> K{Response Agent}
+    K --> L{Confidence Scoring}
+    L -- High Confidence (>=85%) --> E
+    L -- Medium/Low Confidence (<85%) --> M{Escalation Agent}
+    M --> N[Notify Admin]
+    N --> O[Admin Response]
+    O --> P[Update Cache & KB]
+    P --> E
 ```
-[Ticket Created] 
-    ↓
-[Initialize State] → [Check Cache] 
-    ↓                    ↓ (cache hit)
-[Route Query]        [Assess Quality]
-    ↓                    ↓
-[Retrieve Context]   [Finalize]
-    ↓
-[Generate Response]
-    ↓
-[Assess Quality]
-    ↓ (low confidence)
-[Escalate to Human] → [Finalize]
-```
 
-### Multi-Agent System
-1. **Routing Agent**: 
-   - Checks semantic cache for similar resolved queries
-   - Classifies queries (EC vs IA admin type)
-   - Decomposes queries for better retrieval
-   
-2. **Retriever Agent**:
-   - Performs vector similarity search in Pinecone
-   - Maps ticket categories to knowledge base categories
-   - Re-ranks results based on relevance
+### Multi-Agent System Details
 
-3. **Response Agent**:
-   - Generates contextual responses using Gemini LLM
-   - Personalizes cached responses
-   - Maintains conversation context
+1.  **Routing Agent**:
+    *   **Purpose**: Initial processing of student queries.
+    *   **Functions**: Performs semantic search on Redis cache for similar queries, decomposes unclear queries, and triages queries for EC or IA admins.
 
-4. **Escalation Agent**:
-   - Handles low-confidence responses
-   - Routes to appropriate admin (EC/IA)
-   - Provides context for human review
+2.  **Retriever Agent**:
+    *   **Purpose**: Finds relevant information from the knowledge base.
+    *   **Functions**: Searches the Pinecone vector database for top-k relevant chunks, re-ranks retrieved chunks based on context and past ticket ratings.
+
+3.  **Response Agent**:
+    *   **Purpose**: Generates responses to student queries.
+    *   **Functions**: Uses the user's query and retrieved context to generate a response, assigns a confidence score to the generated response.
+
+4.  **Escalation Agent**:
+    *   **Purpose**: Handles human handoffs for complex or low-confidence queries.
+    *   **Functions**: Notifies relevant EC or IA admins, provides suggested responses, and updates ticket status to "Action Required."
+
+## 🗄️ Data Sources and Formats
+
+### Database Schemas
+
+*   **PostgreSQL**: Primary transactional database for user and ticket metadata.
+    *   `users` table: `id`, `email`, `password_hash`, `role` (`student`/`admin`), `created_at`.
+    *   `tickets` table: `id`, `user_id`, `category`, `status`, `title`, `message`, `created_at`, `assigned_to` (`admin_id`), `rating`.
+    *   `conversations` table: `id`, `ticket_id`, `sender_role` (`student`/`agent`/`admin`), `message`, `timestamp`.
+
+*   **MongoDB**: Document storage for knowledge base categories.
+    *   Each knowledge base category (e.g., `product_support`, `leave`) has its own collection.
+    *   Example: `product_support` collection: `doc_id`, `file_name`, `content`, `metadata` (e.g., `category`, `source_url`), `created_at`.
+
+### Knowledge Base Structure
+
+The system uses distinct knowledge base categories, each mapped to a MongoDB collection and indexed in Pinecone:
+
+| Category            | MongoDB Collection         | Content Type                       |
+| :------------------ | :------------------------- | :--------------------------------- |
+| **Program Details** | `program_details_documents` | Course info, schedules, policies   |
+| **Q&A**             | `qa_documents`             | FAQs, troubleshooting, common issues |
+| **Curriculum Documents** | `curriculum_documents`     | Technical content, assignments, evaluations |
+
+### Caching and Vector Storage
+
+*   **Redis**: Used for semantic caching of previously resolved queries and their responses to improve efficiency and reduce LLM calls.
+*   **Pinecone**: The vector database stores embeddings of knowledge base documents, enabling semantic search for relevant information during retrieval.
+
+## ➕ Instructions to Add New Programs / Knowledge Bases
+
+To extend the system with new programs or knowledge base categories, follow these steps:
+
+1.  **Define New Category**: Determine the name and purpose of your new knowledge base category (e.g., `admissions_info`).
+
+2.  **MongoDB Collection**: A new collection will automatically be created in MongoDB when documents for this category are first uploaded via the admin interface.
+
+3.  **Prepare Documents**: Gather the relevant documents (text, PDFs, etc.) for the new program/category. Ensure they are clean and well-structured for optimal embedding.
+
+4.  **Upload via Admin Interface**: Use the `/admin/documents/upload` API endpoint (or the corresponding UI if implemented) to upload documents for the new category. The system will automatically:
+    *   Store the documents in the designated MongoDB collection.
+    *   Generate embeddings for the document content using the Gemini embedding model.
+    *   Upsert these embeddings into the Pinecone vector database, associated with the new category.
+
+5.  **Update Routing Agent (if necessary)**: If the new program introduces a distinct type of query that the Routing Agent needs to specifically identify or triage, you might need to update the LLM's prompt or fine-tune the agent's logic to recognize and route these new query types correctly.
+
+6.  **Test Retrieval**: After uploading, test the system by submitting queries related to the new program/category to ensure the Retriever Agent can accurately find and utilize the newly added information.
+
+By following these steps, the new program's information will be integrated into the RAG system, allowing the agents to retrieve and respond to related student queries effectively.
 
 ## 🛠️ Manual Setup
 
