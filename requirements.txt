@@ -50,4 +50,3 @@ bcrypt==4.1.2
 python-dotenv==1.0.0
 
 # Google Cloud
-google-cloud-sdk
