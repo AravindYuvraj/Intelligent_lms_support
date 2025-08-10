@@ -34,6 +34,7 @@ export default function LoginForm() {
       );
       const data = await response.json();
       if (response.ok && data.session_token) {
+        document.cookie = `session_token=${data.session_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`; 
         localStorage.setItem("authToken", data.session_token);
         localStorage.setItem("userRole", data.role);
         localStorage.setItem("userEmail", data.email);

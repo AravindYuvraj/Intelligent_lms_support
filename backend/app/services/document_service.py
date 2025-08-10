@@ -454,8 +454,16 @@ class DocumentService:
 
         for collection_name in collections_to_search:
             collection = self.mongodb[collection_name]
-            # CORRECTED: Run the entire blocking DB operation in the thread pool
-            docs_list = await run_in_threadpool(fetch_and_process_docs, collection)
-            documents.extend(docs_list)
-        
+
+            # Fully fetch in a threadpool to avoid blocking
+            def fetch_all_docs():
+                results = []
+                for doc in collection.find({}, {"content": 0}):
+                    doc["_id"] = str(doc["_id"])
+                    results.append(doc)
+                return results
+
+            docs = await run_in_threadpool(fetch_all_docs)
+            documents.extend(docs)
+
         return documents

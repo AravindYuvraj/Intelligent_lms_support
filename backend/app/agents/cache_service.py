@@ -1,7 +1,7 @@
 import json
 import numpy as np
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from backend.app.db.base import get_redis
 from backend.app.core.config import settings
@@ -107,7 +107,7 @@ class SemanticCacheService:
             
             # Generate embedding for the query
             query_embedding = await self.embeddings.aembed_query(query)
-            
+            IST = timezone(timedelta(hours=5, minutes=30))
             # Create cache entry
             cache_data = {
                 "query": query,
@@ -116,7 +116,7 @@ class SemanticCacheService:
                 "category": category,
                 "embedding": query_embedding,
                 "metadata": metadata or {},
-                "timestamp": datetime.now(ZoneInfo("Asia/Kolkata")).timestamp()
+                "timestamp": datetime.now(IST).replace(microsecond=0).isoformat() 
             }
             
             # Store in Redis with expiration (7 days)
