@@ -21,19 +21,16 @@ class AnalyticsService:
         :param event_type: Type of the event (e.g., 'ticket_created', 'agent_resolved', 'human_resolved', 'escalated', 'cache_hit').
         :param data: Additional data associated with the event (e.g., {'category': 'Course Query', 'confidence': 0.95}).
         """
-        pipe = self.redis.pipeline()
         key = self._get_key(event_type)
-        pipe.incr(key)
+        self.redis.incr(key)
 
         if data and 'category' in data:
             category_key = self._get_key(f"{event_type}_by_category:{data['category']}")
-            pipe.incr(category_key)
+            self.redis.incr(category_key)
 
         if event_type == 'agent_resolved' and 'confidence' in data:
             confidence_key = self._get_key('agent_confidence_scores')
-            pipe.rpush(confidence_key, data['confidence'])
-
-        pipe.execute()
+            self.redis.rpush(confidence_key, data['confidence'])
 
     def get_analytics(self, days: int = 7) -> Dict[str, Any]:
         """
