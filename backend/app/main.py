@@ -16,7 +16,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend
+    allow_origins=["http://localhost:3000","https://intelligent-lms-support-ppfz.vercel.app"],  # React frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +25,9 @@ app.add_middleware(
 # Add session middleware
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.SESSION_SECRET_KEY
+    secret_key=settings.SESSION_SECRET_KEY,
+    same_site="none",   
+    https_only=True 
 )
 
 # Include routers
