@@ -37,3 +37,17 @@ pydantic>=2.7.4
 httpx==0.25.2
 cloudinary==1.36.0
 celery==5.3.4
+
+# Testing
+pytest==7.4.3
+requests==2.31.0
+
+# Security
+pyjwt==2.8.0
+bcrypt==4.1.2
+
+# Environment
+python-dotenv==1.0.0
+
+# Google Cloud
+google-cloud-sdk
