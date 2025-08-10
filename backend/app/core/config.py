@@ -1,6 +1,5 @@
-import os
 import json
-from typing import Dict, Optional
+from typing import Dict
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -31,10 +30,6 @@ class Settings(BaseSettings):
     PINECONE_INDEX_MAP: Dict[str, str]
     MONGO_COLLECTION_MAP: Dict[str, str]
     
-    # --- LangSmith Configuration (Optional) ---
-    LANGCHAIN_TRACING_V2: Optional[bool] = True
-    LANGCHAIN_API_KEY: Optional[str] = None
-    
     # --- Application Configuration ---
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -44,6 +39,7 @@ class Settings(BaseSettings):
         # Specifies the .env file to load variables from.
         env_file = ".env"
         env_file_encoding = 'utf-8'
+        extra = "allow"
 
 # Create a single, globally accessible instance of the settings.
 settings = Settings()

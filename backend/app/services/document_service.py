@@ -12,7 +12,6 @@ import io # NEW: Import io for handling bytes with pandas
 # Third-party imports
 import pandas as pd
 from fastapi import UploadFile
-from pymongo import MongoClient
 from pinecone import Pinecone, Index
 from bson.objectid import ObjectId
 import gridfs

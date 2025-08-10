@@ -253,11 +253,6 @@ MONGODB_URL=mongodb://localhost:27017/lms_support
 PINECONE_API_KEY=your_pinecone_key
 PINECONE_INDEX_NAME=lms-support-index
 REDIS_URL=redis://localhost:6379/0
-
-# Optional
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your_langsmith_key
-DEBUG=true
 ```
 
 ### Adding New Programs

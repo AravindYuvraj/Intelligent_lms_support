@@ -250,7 +250,7 @@ class EnhancedLangGraphWorkflow:
         category = state["category"]
         original_query = state["original_query"]
 
-        kb_category = get_kb_category(category)
+        kb_category = self._get_kb_category(category)
 
         # Only rewrite for the specified categories
         if kb_category not in ["curriculum_documents", "program_details_documents"]:
@@ -467,7 +467,7 @@ Make your decision.
                 message = decision.get('response', "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info']))
                 conversation_service.create_conversation(ticket_id, "agent", message, confidence_score=confidence)
                 
-                admin = await find_available_admin(decision.get("admin_type", "EC"))
+                admin = await self._find_available_admin(decision.get("admin_type", "EC"))
                 print(f"admin in request info {admin}.")
                 admin_id = admin["id"] if admin else None
                 print(f"assigning admin in request info {admin_id}.")

@@ -2,13 +2,12 @@
 backend/app/agents/retriever_agent.py
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 
 # Local application imports
 from backend.app.services.document_service import DocumentService
 from .state import AgentState, WorkflowStep
-from utils import get_kb_category
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,6 @@ class RetrieverAgent:
         self.MEDIUM_CONFIDENCE_THRESHOLD = 0.75
         self.MIN_HIGH_CONFIDENCE_DOCS = 3 # Minimum docs to accept the high-confidence tier
 
-
     async def process(self, state: AgentState) -> AgentState:
         """
         Processes the user query to retrieve relevant context using a tiered
@@ -51,7 +49,7 @@ class RetrieverAgent:
                 raise Exception("DocumentService not initialized")
             
             # 1. Map the incoming ticket category...
-            kb_category = get_kb_category(category)
+            kb_category = self._get_kb_category(category)
             
             if not kb_category:
                 print(f"No knowledge base mapping for category: {category}. Skipping retrieval.")
@@ -60,9 +58,8 @@ class RetrieverAgent:
                 return state
 
             # 1. Map category and define search scope
-            primary_kb_category = self._get_kb_category(category)
-            search_categories = [primary_kb_category]
-            # if primary_kb_category != 'qa_documents':
+            search_categories = [kb_category]
+            # if kb_category != 'qa_documents':
             #     search_categories.append('qa_documents')
             
             print(f"Searching in categories: {search_categories}")
@@ -75,7 +72,7 @@ class RetrieverAgent:
             )
             print(f"Retrieved {len(search_results)} total candidate documents.")
             
-            if len(search_results) == 0 and primary_kb_category != 'qa_documents':
+            if len(search_results) == 0 and kb_category != 'qa_documents':
                 search_results = await self.document_service.search_documents(
                 query=query,
                 categories=search_categories,

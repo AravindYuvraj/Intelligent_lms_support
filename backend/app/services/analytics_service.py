@@ -1,13 +1,11 @@
-import redis
 from typing import Dict, Any, List
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo 
 from backend.app.db.base import get_redis
-import json
 
 class AnalyticsService:
-    def __init__(self, redis_client: redis.Redis = None):
-        self.redis = redis_client if redis_client else get_redis()
+    def __init__(self):
+        self.redis = get_redis()
 
     def _get_key(self, metric: str, date: str = None):
         if date is None:
