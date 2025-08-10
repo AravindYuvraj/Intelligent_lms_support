@@ -22,7 +22,7 @@ import AdminDashboardLayout from "@/components/admin-dashboard-layout";
 
 interface DocumentRecord {
   _id: string;
-  name: string;
+  file_name: string;
   upload_date: string;
   category?: string;
 }
@@ -53,6 +53,7 @@ const categoryGuides: CategoryGuide[] = [
         description: "Evaluation policies",
       },
       { name: "Withdrawal", description: "Withdrawal policies" },
+      { name: "Other Course Query", description:"Details of Course Curriculum" },
     ],
   },
   {
@@ -267,7 +268,7 @@ export default function AdminDocumentsPage() {
                       className="flex items-center justify-between bg-gray-50 rounded p-3"
                     >
                       <div className="space-y-1">
-                        <div className="font-medium">{doc.name}</div>
+                        <div className="font-medium">{doc.file_name}</div>
                         <div className="flex items-center space-x-2 text-sm text-gray-500">
                           <span>
                             {doc.upload_date

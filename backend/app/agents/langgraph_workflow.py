@@ -21,7 +21,8 @@ from .escalation_agent import EscalationAgent
 import traceback
 import re
 from typing_extensions import Literal, Annotated
-from utils import get_kb_category, find_available_admin
+from backend.app.services.analytics_service import analytics_service
+
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,72 @@ class EnhancedLangGraphWorkflow:
         self.retriever_agent = RetrieverAgent()
         self.escalation_agent = EscalationAgent()
         self.workflow = self._build_workflow()
+      
+    async def _find_available_admin(self, admin_type: str) -> Dict[str, Any]:
+        """
+        Finds an available admin.
+        In a real system, this would check for load, online status, and specialty.
+        For now, it returns the first available admin.
+        """
+        try:
+            # This logic can be expanded to filter by EC/IA roles if they are stored in the user model
+            admins = user_service.get_admins(admin_type=admin_type)
+            print(f"available admins {admins}.")
+            return admins[0] if admins else None
+        except Exception as e:
+            logger.error(f"Error finding admin: {e}")
+            return None
         
+    def _get_kb_category(self, ticket_category: Optional[str]) -> Optional[str]:
+        """
+        Maps an incoming ticket category to one of the three main knowledge base categories.
+        
+        Returns the name of the knowledge base category (e.g., "program_details_documents").
+        """
+        if not ticket_category:
+            print("No category provided, defaulting to qa_documents")
+            return "qa_documents"
+
+        # Enhanced mapping with more detailed logging
+        category_mapping = {
+            # Program and administrative related -> Program Details
+            "Course Query": "program_details_documents",
+            "Attendance/Counselling Support": "program_details_documents", 
+            "Leave": "program_details_documents",
+            "Late Evaluation Submission": "program_details_documents",
+            "Missed Evaluation Submission": "program_details_documents",
+            "Withdrawal": "program_details_documents",
+            "Other Course Query": "program_details_documents",
+            
+            # Technical and curriculum related -> Curriculum Documents
+            "Evaluation Score": "curriculum_documents",
+            "MAC": "curriculum_documents",
+            "Revision": "curriculum_documents",
+            
+            # General support, FAQs, troubleshooting -> qa_documents
+            "Product Support": "qa_documents",
+            "NBFC/ISA": "qa_documents",
+            "Feedback": "qa_documents",
+            "Referral": "qa_documents",
+            "Personal Query": "qa_documents",
+            "Code Review": "qa_documents",
+            "Placement Support - Placements": "qa_documents",
+            "Offer Stage- Placements": "qa_documents", 
+            "ISA/EMI/NBFC/Glide Related - Placements": "qa_documents",
+            "Session Support - Placement": "qa_documents",
+            "IA Support": "qa_documents",
+        }
+        
+        mapped_category = category_mapping.get(ticket_category)
+        
+        if mapped_category:
+            print(f"CATEGORY MAPPING: '{ticket_category}' -> '{mapped_category}'")
+        else:
+            print(f" UNMAPPED CATEGORY: '{ticket_category}', defaulting to 'qa_documents'")
+            mapped_category = "qa_documents"
+        
+        return mapped_category
+
     def _build_workflow(self) -> StateGraph:
         """Builds the simplified, more powerful LangGraph workflow."""
         print("Building LangGraph workflow...")
@@ -154,13 +220,23 @@ class EnhancedLangGraphWorkflow:
         """Check semantic cache for similar resolved queries."""
         print(f"CHECKING CACHE for ticket {state['ticket_id']}")
         cached_result = await self.cache_service.search_similar(
-            state["original_query"], threshold=0.85
+            state["original_query"], threshold=0.65
         )
+        
+        def sanitize_kb_content(content: str) -> str:
+                # Remove greetings, closings, personal names, phone numbers
+                content = re.sub(r"Dear .*?,", "", content)
+                content = re.sub(r"Thanks.*", "", content, flags=re.IGNORECASE | re.DOTALL)
+                content = re.sub(r"Thank you *", "", content, flags=re.IGNORECASE | re.DOTALL)
+                content = re.sub(r"\+?\d[\d -]{8,}", "[REDACTED PHONE]", content)
+                return content.strip()
         
         if cached_result:
             print(f"CACHE HIT! Similarity: {cached_result.get('similarity', 'N/A')},{cached_result['response']} ")
-            state["context"] = f"A similar query was resolved in the past.\nCached Response: {cached_result['response']}"
+            formatted_context = sanitize_kb_content(cached_result.get("response", ""))
+            state["context"] = f"A similar query was resolved in the past.\nCached Response: {formatted_context}"
             state["steps_taken"].append("cache_hit")
+            analytics_service.log_event('cache_hit', {'category': state.get('category')}) # Added
         else:
             print(f"CACHE MISS for ticket {state['ticket_id']}")
             state["context"] = None # Explicitly set to None for the conditional edge
@@ -311,13 +387,15 @@ Thank you for reaching out to us. Supporting our students is our highest priorit
              Also you may understand Masai's style from it and generate your response similarly.
              DO NOT USE IT VERBATIM. Must be rewritten in your own words.
              Knowledge base context may be of 2 types:
-             1. Previously resolved tickets for reference - DO NOT COPY THE CONTENT, consider that the information might be old and currently irrelevant. Generate your decision and response accordingly
+             1. Previously resolved tickets for reference - DO NOT COPY THE CONTENT, consider that the information might be old and currently irrelevant. Generate your decision and response accordingly. Do not promise or claim to do anything that you do not have the capacity or authority to do. Escalate the ticket to admin instead.
              2. Program and Curriculum details - for course related queries, you can use this information to generate your response.
 **Available Knowledge Base Context :**
 {context}
 
 **Current User Query:**
 {query}
+
+Also go through message history, if any
 
 Make your decision.
 """)
@@ -375,6 +453,7 @@ Make your decision.
         try:
             decision = state.get("agent_decision")
             ticket_id = state["ticket_id"]
+            category = state.get("category") # Added
 
             if not decision:
                 raise ValueError("Agent decision not found in state, cannot finalize.")
@@ -398,7 +477,7 @@ Make your decision.
             # Outcome 2: Escalate to a human admin
             elif action == 'escalate':
                 print(f"Action: Escalating to human admin ({decision.get('admin_type')}).")
-                # The escalation agent assigns the ticket, sets status, and creates the conversation
+                analytics_service.log_event('escalated', {'category': category}) # Added
                 await self.escalation_agent.process({
                     "ticket_id": ticket_id, "admin_type": decision.get("admin_type", "EC"),
                     "response": decision.get("response", "")
@@ -409,17 +488,12 @@ Make your decision.
             elif action == 'respond' and decision.get('response'):
                 print("Action: Responding and resolving ticket.",decision.get("admin_type", "EC"), )
                 response = decision['response']
-                conversation_service.create_conversation(ticket_id, "agent", response, confidence_score=confidence)
-                
-                admin = await self._find_available_admin(decision.get("admin_type", "EC"))
-                print(f"admin in respond {admin}.")
-                admin_id = admin["id"] if admin else None
-                print(f"assigning admin in respond {admin_id}.")
-                ticket_service.update_ticket_status(ticket_id, TicketStatus.RESOLVED.value, admin_id)
+                analytics_service.log_event('agent_resolved', {'category': category, 'confidence': confidence}) # Added
+                conversation_service.create_conversation(ticket_id, "agent", response, confidence_score=confidence * 100) # Modified
+                ticket_service.update_ticket_status(ticket_id, TicketStatus.RESOLVED.value)
                 state["final_status"] = TicketStatus.RESOLVED.value
-                
-                # Cache high-confidence, successful responses
-                if confidence >= 0.85 and 'A similar query was resolved in the past' not in state["context"]:
+
+                if confidence >= 0.85 and "cache_miss" in state["steps_taken"]:
                     await self.cache_service.store_response(state["original_query"], response, confidence, state["category"])
                     print("Stored successful response in cache.")
             
@@ -431,12 +505,13 @@ Make your decision.
             traceback.print_exc()
             state["error_message"] = f"Finalization failed: {str(e)}"
             # Safe fallback: escalate the ticket
+            analytics_service.log_event('escalated', {'category': state.get('category'), 'reason': 'finalization_error'}) # Added
             await self.escalation_agent.process({"ticket_id": state["ticket_id"], "admin_type": "EC"})
             state["final_status"] = TicketStatus.ADMIN_ACTION_REQUIRED.value
 
         state["steps_taken"].append(f"finalized_as_{state['final_status']}")
         return state
-
+    
     async def process_ticket(self, ticket_id: str):
         """Main entry point to process a ticket through the workflow."""
         print(f"\n--- STARTING WORKFLOW for ticket {ticket_id} ---")

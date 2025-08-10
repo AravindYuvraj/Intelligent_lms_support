@@ -68,6 +68,24 @@ export default function AdminTicketDetailPage() {
     }
   };
 
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
+    if (isNaN(date.getTime())) {
+      console.error("Invalid timestamp received:", timestamp);
+      return "Invalid Date";
+    }
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  };
+
+
   const formatSenderName = (email: string | undefined, role: string) => {
     if (email) {
       const name = email.split("@")[0];

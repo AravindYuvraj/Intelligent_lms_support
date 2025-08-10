@@ -5,10 +5,12 @@ from backend.app.core.deps import get_current_admin, get_document_service
 from backend.app.api.tickets.schemas import TicketListResponse, TicketDetailResponse, ConversationResponse, TicketResponse
 from backend.app.services.document_service import DocumentService
 import logging
+from .schemas import AnalyticsResponse
+from backend.app.services.analytics_service import analytics_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
+    
 # --------------------------------------------------------------------------
 # NOTE on Ticket Listing:
 # The original code had an "N+1" query problem, causing many database calls.
@@ -110,6 +112,9 @@ async def resolve_ticket(
     except Exception as e:
         logger.error(f"Error storing admin response in cache: {str(e)}")
     
+    if status == "Resolved":
+        analytics_service.log_event('human_resolved', {'category': ticket.get("category")})
+    
     return {
         "message": "Ticket resolved successfully",
         "ticket_status": new_status
@@ -187,3 +192,13 @@ async def list_documents(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list documents: {str(e)}"
         )
+        
+@router.get("/analytics", response_model=AnalyticsResponse)
+async def get_analytics(
+        current_user: Dict[str, Any] = Depends(get_current_admin)
+    ):
+        """
+        Get analytics for the admin dashboard.
+        """
+        analytics_data = analytics_service.get_analytics(days=7)
+        return analytics_data
