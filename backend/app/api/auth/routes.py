@@ -29,7 +29,8 @@ async def login(
         value=session_token,
         httponly=True,
         max_age=86400 * 7,  # 7 days
-        samesite="strict"
+        samesite="none",
+        secure=True
     )
     
     return LoginResponse(
