@@ -1,10 +1,8 @@
 import json
 import numpy as np
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone, timedelta
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from typing import Dict, Any, Optional
+from datetime import datetime
 from backend.app.db.base import get_redis
-from backend.app.core.config import settings
 import logging
 from zoneinfo import ZoneInfo 
 import time

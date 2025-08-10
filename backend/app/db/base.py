@@ -1,5 +1,4 @@
 from pymongo import MongoClient
-import redis
 from backend.app.core.config import settings
 from upstash_redis import Redis
 

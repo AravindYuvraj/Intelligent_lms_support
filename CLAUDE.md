@@ -116,11 +116,6 @@ Pinecone: The vector database for the agentic RAG system. It will store vector e
 Redis: Used for a semantic cache. Before a query goes through the full RAG pipeline, the Routing Agent will perform a semantic search on Redis. If a similar query and response exist, the response is retrieved and personalized by the LLM, bypassing the retrieval process to improve efficiency.
 Cloudinary: A cloud-based service for storing ticket attachments uploaded by students.
 
-5. Other Tools
-LangSmith: This tool will be used for monitoring, tracing, and debugging the LangGraph workflow, allowing for better observability and continuous improvement of the agents' performance.
-Celery (Implicit): Given the tight 3-day deadline and the need for a scalable queue to process tickets, a tool like Celery would be essential for handling asynchronous tasks, such as document processing and vector database updates, to avoid blocking the main API thread.
-
-
 # Backend Plan
 Backend Plan: API Endpoints, Schema, and Agentic Flow
 This detailed backend plan outlines the architecture, data flow, and specific technical components for the Masai LMS Support System. It covers API endpoints, database schemas, the multi-agentic RAG workflow, and how information is structured and processed at each stage.
