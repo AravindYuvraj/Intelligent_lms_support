@@ -103,6 +103,10 @@ export default function AdminSupportPage() {
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
+    if (isNaN(date.getTime())) {
+      console.error("Invalid timestamp received:", timestamp);
+      return "Invalid Date";
+    }
     return new Intl.DateTimeFormat("en-IN", {
       timeZone: "Asia/Kolkata",
       year: "numeric",
