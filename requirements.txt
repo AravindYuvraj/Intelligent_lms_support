@@ -19,6 +19,8 @@ langsmith==0.1.137
 langchain_huggingface==0.1.0
 sentence-transformers==3.0.1
 
+# Redis
+upstash-redis==0.15.0
 
 # Vector Database
 pinecone-client==5.0.1

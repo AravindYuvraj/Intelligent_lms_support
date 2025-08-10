@@ -121,16 +121,16 @@ class SemanticCacheService:
             
             # Store in Redis with expiration (7 days)
             cache_key = f"cache:{hash(query)}"
-            self.redis_client.setex(
+            self.redis_client.set(
                 cache_key,
-                604800,  # 7 days in seconds
-                json.dumps(cache_data, default=str)
+                json.dumps(cache_data, default=str),
+                {"ex": 604800} 
             )
             
             print(f"CACHED SUCCESSFULLY: key={cache_key}")
             
         except Exception as e:
-            print(f"Error storing in cache")
+            print(f"Error storing in cache",e)
     
     async def invalidate_category(self, category: str):
         """Invalidate cache entries for a specific category (useful when knowledge base is updated)"""
