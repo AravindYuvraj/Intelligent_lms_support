@@ -1,23 +1,29 @@
 # Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Install uv - the python package manager used in the project
+# Create a virtual environment
+RUN python -m venv /opt/venv
+
+# Ensure venv's bin directory is in PATH
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install uv in the venv
 RUN pip install uv
 
-# Copy the requirements file into the container at /app
+# Copy requirements first (for caching)
 COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
+# Install dependencies with uv inside the venv
 RUN uv pip install --system -r requirements.txt
 
-# Copy the rest of the application's code into the container
+# Copy the rest of the application code
 COPY . .
 
-# Make port 8000 available to the world outside this container
+# Expose FastAPI port
 EXPOSE 8000
 
-# Run run.py when the container launches
-CMD ["python3", "run.py"]
+# Default command to run the app
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

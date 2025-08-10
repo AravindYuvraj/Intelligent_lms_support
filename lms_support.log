@@ -31,3 +31,30 @@ TypeError: Expected str, not <class 'pydantic.v1.types.SecretStr'>
             - Steps: initialize -> cache_miss -> escalated_to_human -> finalized_Action Required
             - Iterations: 0
             
+2025-08-10 15:34:03,948 - backend.app.db.init_db - INFO - Database already initialized with users
+2025-08-10 15:35:59,497 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-mpnet-base-v2
+2025-08-10 15:36:02,625 - pinecone_plugin_interface.logging - INFO - Discovering subpackages in _NamespacePath(['C:\\Users\\aravi\\Downloads\\demo week\\Intelligent_lms_support\\.venv\\Lib\\site-packages\\pinecone_plugins'])
+2025-08-10 15:36:02,627 - pinecone_plugin_interface.logging - INFO - Looking for plugins in pinecone_plugins.inference
+2025-08-10 15:36:03,501 - pinecone_plugin_interface.logging - INFO - Installing plugin inference into Pinecone
+2025-08-10 15:36:05,384 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'program-details-documents' for category 'program_details_documents'
+2025-08-10 15:36:06,163 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'qa-documents' for category 'qa_documents'
+2025-08-10 15:36:07,368 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'curriculum-documents' for category 'curriculum_document'
+2025-08-10 15:36:07,387 - __main__ - ERROR - Startup error: email-validator is not installed, run `pip install pydantic[email]`
+2025-08-10 16:10:56,053 - backend.app.db.init_db - INFO - Database already initialized with users
+2025-08-10 16:10:58,372 - numexpr.utils - INFO - NumExpr defaulting to 16 threads.
+2025-08-10 16:11:46,500 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-mpnet-base-v2
+2025-08-10 16:11:56,734 - pinecone_plugin_interface.logging - INFO - Discovering subpackages in _NamespacePath(['C:\\Users\\aravi\\miniconda3\\Lib\\site-packages\\pinecone_plugins'])
+2025-08-10 16:11:56,736 - pinecone_plugin_interface.logging - INFO - Looking for plugins in pinecone_plugins.inference
+2025-08-10 16:11:56,811 - pinecone_plugin_interface.logging - INFO - Installing plugin inference into Pinecone
+2025-08-10 16:11:58,722 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'program-details-documents' for category 'program_details_documents'
+2025-08-10 16:11:59,943 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'qa-documents' for category 'qa_documents'
+2025-08-10 16:12:00,969 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'curriculum-documents' for category 'curriculum_document'
+2025-08-10 16:12:01,414 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-mpnet-base-v2
+2025-08-10 16:12:05,698 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-mpnet-base-v2
+2025-08-10 16:12:10,613 - pinecone_plugin_interface.logging - INFO - Discovering subpackages in _NamespacePath(['C:\\Users\\aravi\\miniconda3\\Lib\\site-packages\\pinecone_plugins'])
+2025-08-10 16:12:10,614 - pinecone_plugin_interface.logging - INFO - Looking for plugins in pinecone_plugins.inference
+2025-08-10 16:12:10,614 - pinecone_plugin_interface.logging - INFO - Installing plugin inference into Pinecone
+2025-08-10 16:12:10,617 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'program-details-documents' for category 'program_details_documents'
+2025-08-10 16:12:10,618 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'qa-documents' for category 'qa_documents'
+2025-08-10 16:12:10,619 - backend.app.services.document_service - INFO - Successfully connected to Pinecone index: 'curriculum-documents' for category 'curriculum_document'
+2025-08-10 16:30:54,754 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-mpnet-base-v2
