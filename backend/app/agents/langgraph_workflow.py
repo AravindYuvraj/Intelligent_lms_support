@@ -23,6 +23,7 @@ import re
 from typing_extensions import Literal, Annotated
 from backend.app.services.analytics_service import analytics_service
 
+
 logger = logging.getLogger(__name__)
 
 # Enhanced State Definition with LangGraph annotations
@@ -79,7 +80,7 @@ class EnhancedLangGraphWorkflow:
         self.retriever_agent = RetrieverAgent()
         self.escalation_agent = EscalationAgent()
         self.workflow = self._build_workflow()
-        
+      
     async def _find_available_admin(self, admin_type: str) -> Dict[str, Any]:
         """
         Finds an available admin.
@@ -144,7 +145,6 @@ class EnhancedLangGraphWorkflow:
             mapped_category = "qa_documents"
         
         return mapped_category
-
 
     def _build_workflow(self) -> StateGraph:
         """Builds the simplified, more powerful LangGraph workflow."""
@@ -250,7 +250,7 @@ class EnhancedLangGraphWorkflow:
         category = state["category"]
         original_query = state["original_query"]
 
-        kb_category = self._get_kb_category(category)
+        kb_category = get_kb_category(category)
 
         # Only rewrite for the specified categories
         if kb_category not in ["curriculum_documents", "program_details_documents"]:
@@ -467,7 +467,7 @@ Make your decision.
                 message = decision.get('response', "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info']))
                 conversation_service.create_conversation(ticket_id, "agent", message, confidence_score=confidence)
                 
-                admin = await self._find_available_admin(decision.get("admin_type", "EC"))
+                admin = await find_available_admin(decision.get("admin_type", "EC"))
                 print(f"admin in request info {admin}.")
                 admin_id = admin["id"] if admin else None
                 print(f"assigning admin in request info {admin_id}.")

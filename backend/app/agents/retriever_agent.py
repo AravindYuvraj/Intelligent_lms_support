@@ -2,12 +2,13 @@
 backend/app/agents/retriever_agent.py
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import logging
 
 # Local application imports
 from backend.app.services.document_service import DocumentService
 from .state import AgentState, WorkflowStep
+from utils import get_kb_category
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class RetrieverAgent:
                 raise Exception("DocumentService not initialized")
             
             # 1. Map the incoming ticket category...
-            kb_category = self._get_kb_category(category)
+            kb_category = get_kb_category(category)
             
             if not kb_category:
                 print(f"No knowledge base mapping for category: {category}. Skipping retrieval.")

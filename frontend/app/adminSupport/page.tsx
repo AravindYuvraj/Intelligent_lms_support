@@ -3,33 +3,12 @@
 import AdminDashboardLayout from "@/components/admin-dashboard-layout";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { getStatusColor } from "@/utils";
+import { Ticket } from "@/types";
+import { formatTimestamp, getStatusColor } from "@/utils";
 import { MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-interface Ticket {
-  id: string;
-  user_id: string;
-  category: string;
-  status:
-    | "Open"
-    | "Work in Progress"
-    | "Student Action Required"
-    | "Admin Action Required"
-    | "Resolved"
-    | "Closed";
-  title: string;
-  created_at: string;
-  updated_at?: string;
-  rating?: number;
-  assigned_to?: string;
-  assigned_admin_email?: string;
-  response_count: number;
-  last_response?: string;
-  last_response_time?: string;
-}
 
 export default function AdminSupportPage() {
   const [activeTab, setActiveTab] = useState<"unresolved" | "resolved">(
