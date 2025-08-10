@@ -25,6 +25,7 @@ const categories = [
   'Referral',
   'Evaluation Score',
   'Course Query',
+  'Other Course Query',
   'Code Review',
   'Personal Query',
   'NBFC/ISA',

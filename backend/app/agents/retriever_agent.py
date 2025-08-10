@@ -61,8 +61,8 @@ class RetrieverAgent:
             # 1. Map category and define search scope
             primary_kb_category = self._get_kb_category(category)
             search_categories = [primary_kb_category]
-            if primary_kb_category != 'qa_documents':
-                search_categories.append('qa_documents')
+            # if primary_kb_category != 'qa_documents':
+            #     search_categories.append('qa_documents')
             
             print(f"Searching in categories: {search_categories}")
 
@@ -73,6 +73,15 @@ class RetrieverAgent:
                 top_k=10 # Fetch a larger pool for better filtering
             )
             print(f"Retrieved {len(search_results)} total candidate documents.")
+            
+            if len(search_results) == 0 and primary_kb_category != 'qa_documents':
+                search_results = await self.document_service.search_documents(
+                query=query,
+                categories=search_categories,
+                top_k=10 # Fetch a larger pool for better filtering
+            )
+                print(f"Retrieved from backup qa_documents {len(search_results)} total candidate documents.")
+                
 
             # 3. Apply the tiered confidence filtering logic
             selected_chunks = []
@@ -153,6 +162,7 @@ class RetrieverAgent:
             "Late Evaluation Submission": "program_details_documents",
             "Missed Evaluation Submission": "program_details_documents",
             "Withdrawal": "program_details_documents",
+            "Other Course Query": "program_details_documents",
             
             # Technical and curriculum related -> Curriculum Documents
             "Evaluation Score": "curriculum_documents",
