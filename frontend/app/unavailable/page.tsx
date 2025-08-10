@@ -1,15 +1,16 @@
-"use client";
-
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 
-export default function UnavailablePage() {
-  const searchParams = useSearchParams();
-  const label = searchParams.get("label") || "This page";
-
-const displayLabel = label === "Dashboard" ? "Schedules" : label;
+// 1. Accept `searchParams` as a prop
+export default function UnavailablePage({
+  searchParams,
+}: {
+  searchParams: { label?: string };
+}) {
+  // 2. Get the label directly from the prop
+  const label = searchParams.label || "This page";
+  const displayLabel = label === "Dashboard" ? "Schedules" : label;
 
   return (
     <DashboardLayout>
@@ -17,7 +18,6 @@ const displayLabel = label === "Dashboard" ? "Schedules" : label;
         <h1 className="text-2xl font-semibold text-gray-900 mb-6">
           {displayLabel}
         </h1>
-
         <Card>
           <CardContent className="p-8 text-center">
             <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
