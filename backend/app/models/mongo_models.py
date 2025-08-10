@@ -29,6 +29,7 @@ class TicketCategory(Enum):
     REFERRAL = "Referral"
     EVALUATION_SCORE = "Evaluation Score"
     COURSE_QUERY = "Course Query"
+    OTHER_COURSE_QUERY = "Other Course Query"
     CODE_REVIEW = "Code Review"
     PERSONAL_QUERY = "Personal Query"
     NBFC_ISA = "NBFC/ISA"

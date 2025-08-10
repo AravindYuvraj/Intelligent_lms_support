@@ -114,6 +114,7 @@ class EnhancedLangGraphWorkflow:
             "Late Evaluation Submission": "program_details_documents",
             "Missed Evaluation Submission": "program_details_documents",
             "Withdrawal": "program_details_documents",
+            "Other Course Query": "program_details_documents",
             
             # Technical and curriculum related -> Curriculum Documents
             "Evaluation Score": "curriculum_documents",
