@@ -11,9 +11,6 @@ logger = logging.getLogger(__name__)
 
 IST = ZoneInfo('Asia/Kolkata')
 
-def get_ist_now():
-    return datetime.now(IST).replace(microsecond=0).isoformat()
-
 class UserRole(Enum):
     STUDENT = "student"
     ADMIN = "admin"
@@ -62,7 +59,7 @@ class UserService(MongoBaseService):
             "email": email,
             "password_hash": password_hash,
             "role": role,
-            "created_at": get_ist_now()
+            "created_at": datetime.now(IST)
         }
         if user_type:
             user_doc["type"] = user_type
@@ -107,7 +104,7 @@ class TicketService(MongoBaseService):
                      from_date: Optional[str] = None, to_date: Optional[str] = None,
                      attachments: Optional[List[str]] = None) -> str:
         """Create a new ticket"""
-        print('Received Create request',title, message)
+        print('Received Create request',title, message, datetime.now(IST))
         ticket_doc = {
             "user_id": user_id,
             "category": category,
@@ -120,8 +117,8 @@ class TicketService(MongoBaseService):
             "attachments": attachments or [],
             "assigned_to": None,
             "rating": None,
-            "created_at": get_ist_now(),
-            "updated_at": get_ist_now(),
+            "created_at": datetime.now(IST),
+            "updated_at": datetime.now(IST),
         }
         
         result = self.collection.insert_one(ticket_doc)
@@ -139,7 +136,7 @@ class TicketService(MongoBaseService):
 
     def update_ticket_timestamp(self, ticket_id: str):
         """Update the updated_at timestamp of a ticket"""
-        self.update_ticket(ticket_id, {"updated_at": get_ist_now()})
+        self.update_ticket(ticket_id, {"updated_at": datetime.now(IST)})
         try:
             ticket = self.collection.find_one({"_id": ObjectId(ticket_id)})
             if ticket:
@@ -177,7 +174,7 @@ class TicketService(MongoBaseService):
     def update_ticket(self, ticket_id: str, update_data: Dict[str, Any]) -> bool:
         """Update ticket"""
         try:
-            update_data["updated_at"] = get_ist_now()
+            update_data["updated_at"] = datetime.now(IST)
             result = self.collection.update_one(
                 {"_id": ObjectId(ticket_id)}, 
                 {"$set": update_data}
@@ -212,7 +209,7 @@ class ConversationService(MongoBaseService):
             "message": message,
             "confidence_score": confidence_score,
             "attachments": attachments,
-            "timestamp": get_ist_now()
+            "timestamp": datetime.now(IST)
         }
         
         result = self.collection.insert_one(conversation_doc)

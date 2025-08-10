@@ -107,7 +107,7 @@ class SemanticCacheService:
             
             # Generate embedding for the query
             query_embedding = await self.embeddings.aembed_query(query)
-            IST = timezone(timedelta(hours=5, minutes=30))
+            IST = ZoneInfo('Asia/Kolkata')
             # Create cache entry
             cache_data = {
                 "query": query,
@@ -116,7 +116,7 @@ class SemanticCacheService:
                 "category": category,
                 "embedding": query_embedding,
                 "metadata": metadata or {},
-                "timestamp": datetime.now(IST).replace(microsecond=0).isoformat() 
+                "timestamp": datetime.now(IST)
             }
             
             # Store in Redis with expiration (7 days)

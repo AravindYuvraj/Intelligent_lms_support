@@ -1,6 +1,7 @@
 import redis
 from typing import Dict, Any, List
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo 
 from backend.app.db.base import get_redis
 import json
 
@@ -10,7 +11,7 @@ class AnalyticsService:
 
     def _get_key(self, metric: str, date: str = None):
         if date is None:
-            IST = timezone(timedelta(hours=5, minutes=30))
+            IST = ZoneInfo('Asia/Kolkata')
             date = datetime.now(IST).strftime('%Y-%m-%d')
         return f"analytics:{date}:{metric}"
 
