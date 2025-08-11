@@ -372,9 +372,13 @@ This project is developed for Masai School as part of the Improving the LMS Supp
 
 ## 📬 Contact
 
-** Aravind Yuraj / Team **
-📧 [your.email@example.com](mailto:your.email@example.com)
-🔗 [GitHub Profile](https://github.com/your-github-profile)
+** Aravind Yuraj **
+📧 [aravind98761234@gmail.com](mailto:aravind98761234@gmail.com)
+🔗 [GitHub Profile](https://github.com/AravindYuvraj)
+
+** Kinjal Momaya **
+📧 [kinjalmomaya99@gmail.com](mailto:kinjalmomaya99@gmail.com)
+🔗 [GitHub Profile](https://github.com/kini99)
 
 ```
 
