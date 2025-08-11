@@ -34,6 +34,10 @@ class GraphState(TypedDict):
     user_id: str
     original_query: str
     category: str
+    
+    # User course information
+    user_course_category: Optional[str]
+    user_course_name: Optional[str]
 
     rewritten_query: Optional[str]
 
@@ -194,6 +198,11 @@ class EnhancedLangGraphWorkflow:
 
             conversations = await asyncio.to_thread(conversation_service.get_ticket_conversations, state["ticket_id"])
             
+            # Fetch user course information
+            user = await asyncio.to_thread(user_service.get_user_by_id, ticket["user_id"])
+            user_course_category = user.get("course_category") if user else None
+            user_course_name = user.get("course_name") if user else None
+            
             messages = []
             for conv in conversations:
                 if conv["sender_role"] == "student":
@@ -202,10 +211,13 @@ class EnhancedLangGraphWorkflow:
                     # Assuming 'agent' or 'support' roles are the AI
                     messages.append(AIMessage(content=conv["message"]))
             print("Updating state category", ticket["category"])
+            print(f"User course info: {user_course_category} - {user_course_name}")
             state.update({
                 "user_id": str(ticket["user_id"]),
                 "original_query": conversations[-1]['message'], # The latest message is the current query
                 "category": ticket["category"],
+                "user_course_category": user_course_category,
+                "user_course_name": user_course_name,
                 "messages": messages,
                 "steps_taken": ["initialize"]
             })
@@ -220,7 +232,10 @@ class EnhancedLangGraphWorkflow:
         """Check semantic cache for similar resolved queries."""
         print(f"CHECKING CACHE for ticket {state['ticket_id']}")
         cached_result = await self.cache_service.search_similar(
-            state["original_query"], threshold=0.65
+            query=state["original_query"],
+            course_category=state.get("user_course_category"),
+            course_name=state.get("user_course_name"),
+            threshold=0.65
         )
         
         def sanitize_kb_content(content: str) -> str:
@@ -310,7 +325,9 @@ class EnhancedLangGraphWorkflow:
                 "original_query": state["original_query"],
                 "category": state["category"],
                 "ticket_id": state["ticket_id"],
-                "rewritten_query": state.get("rewritten_query", state["original_query"])
+                "rewritten_query": state.get("rewritten_query", state["original_query"]),
+                "user_course_category": state.get("user_course_category"),
+                "user_course_name": state.get("user_course_name")
             })
             retrieved_docs = retriever_result.get("retrieved_context", [])
             
@@ -494,7 +511,14 @@ Make your decision.
                 state["final_status"] = TicketStatus.RESOLVED.value
 
                 if confidence >= 0.85 and "cache_miss" in state["steps_taken"]:
-                    await self.cache_service.store_response(state["original_query"], response, confidence, state["category"])
+                    await self.cache_service.store_response(query=state["original_query"], 
+                        response=response, 
+                        confidence=confidence, 
+                        category=state["category"],
+                        metadata={
+                            "course_category": state.get("user_course_category"),
+                            "course_names": [state.get("user_course_name")] if state.get("user_course_name") else []
+                        })
                     print("Stored successful response in cache.")
             
             else:
