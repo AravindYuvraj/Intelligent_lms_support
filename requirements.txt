@@ -22,8 +22,7 @@ upstash-redis==0.15.0
 pinecone-client==5.0.1
 
 # File Processing
-unstructured[pdf,docx,pptx,xlsx,html]==0.14.9
-pdfminer.six==20201018
+unstructured[docx,pdf,pptx,xlsx]>=0.14.10
 pandas==2.1.4
 psutil==5.9.8
 
