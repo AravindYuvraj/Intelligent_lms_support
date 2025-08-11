@@ -107,6 +107,24 @@ async def resolve_ticket(
                 confidence=0.95,  # High confidence for human responses
                 category=ticket["category"]
             )
+            
+            # Store in Pinecone using the same helper
+            from backend.app.services.document_service import DocumentService
+            doc_service = DocumentService()
+
+            await doc_service._store_in_pinecone(
+                index=doc_service._get_index("qa_documents"),
+                doc_id=f"ticket_{ticket_id}",
+                chunks=[original_conv["message"]],
+                category="qa_documents",
+                filename=f"ticket_{ticket_id}_qa",
+                metadata_list=[{
+                    "potential_response": last_admin_msg
+                }]
+            )
+
+            print(f"Stored ticket Q&A in Pinecone for ticket {ticket_id}")
+            
     except Exception as e:
         logger.error(f"Error storing admin response in cache: {str(e)}")
     
