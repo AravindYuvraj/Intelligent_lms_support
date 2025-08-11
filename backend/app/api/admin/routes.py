@@ -144,7 +144,7 @@ async def upload_document(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Document upload error: {str(e)}", exc_info=True)
+        print(f"Document upload error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload document: {str(e)}"
@@ -167,7 +167,7 @@ async def delete_document(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Document deletion error: {str(e)}", exc_info=True)
+        print(f"Document deletion error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete document: {str(e)}"
@@ -187,7 +187,7 @@ async def list_documents(
         valid_categories = list(document_service.valid_categories)
         return {"documents": documents, "categories": valid_categories}
     except Exception as e:
-        logger.error(f"Document listing error: {str(e)}", exc_info=True)
+        print(f"Document listing error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list documents: {str(e)}"
