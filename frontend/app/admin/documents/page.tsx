@@ -22,6 +22,7 @@ import AdminDashboardLayout from "@/components/admin-dashboard-layout";
 
 interface DocumentRecord {
   _id: string;
+  doc_id:string;
   file_name: string;
   upload_date: string;
   category?: string;
@@ -291,7 +292,7 @@ export default function AdminDocumentsPage() {
                         type="button"
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleDelete(doc._id)}
+                        onClick={() => handleDelete(doc.doc_id)}
                         disabled={isLoading}
                       >
                         Delete

@@ -87,6 +87,47 @@ async def resolve_ticket(
     new_status = TicketStatus.RESOLVED.value
     ticket_service.update_ticket_status(ticket_id, new_status, current_user["id"])
     
+    try:
+        # Get original query from first conversation
+        conversations = conversation_service.get_ticket_conversations(ticket_id)
+        original_conv = next((c for c in conversations if c["sender_role"] == "student"), None)
+        
+        last_admin_msg = None
+        for c in reversed(conversations):  # reverse so we get latest first
+            if c["sender_role"] == "admin":
+                last_admin_msg = c["message"]
+                break
+        print('Last admin msg being cached', original_conv["message"], last_admin_msg)
+        if original_conv and last_admin_msg:
+            from backend.app.agents.cache_service import SemanticCacheService
+            cache_service = SemanticCacheService()
+            await cache_service.store_response(
+                query=original_conv["message"],
+                response=last_admin_msg,
+                confidence=0.95,  # High confidence for human responses
+                category=ticket["category"]
+            )
+            
+            # Store in Pinecone using the same helper
+            from backend.app.services.document_service import DocumentService
+            doc_service = DocumentService()
+
+            await doc_service._store_in_pinecone(
+                index=doc_service._get_index("qa_documents"),
+                doc_id=f"ticket_{ticket_id}",
+                chunks=[original_conv["message"]],
+                category="qa_documents",
+                filename=f"ticket_{ticket_id}_qa",
+                metadata_list=[{
+                    "potential_response": last_admin_msg
+                }]
+            )
+
+            print(f"Stored ticket Q&A in Pinecone for ticket {ticket_id}")
+            
+    except Exception as e:
+        logger.error(f"Error storing admin response in cache: {str(e)}")
+    
     # Add conversation entry
     conversation_service.create_conversation(
         ticket_id=ticket_id,
@@ -94,23 +135,6 @@ async def resolve_ticket(
         sender_id=current_user["id"],
         message=message
     )
-    
-    try:
-        # Get original query from first conversation
-        conversations = conversation_service.get_ticket_conversations(ticket_id)
-        original_conv = next((c for c in conversations if c["sender_role"] == "student"), None)
-        
-        if original_conv:
-            from backend.app.agents.cache_service import SemanticCacheService
-            cache_service = SemanticCacheService()
-            await cache_service.store_response(
-                query=original_conv["message"],
-                response=message,
-                confidence=0.95,  # High confidence for human responses
-                category=ticket["category"]
-            )
-    except Exception as e:
-        logger.error(f"Error storing admin response in cache: {str(e)}")
     
     if status == "Resolved":
         analytics_service.log_event('human_resolved', {'category': ticket.get("category")})
@@ -144,7 +168,7 @@ async def upload_document(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Document upload error: {str(e)}", exc_info=True)
+        print(f"Document upload error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload document: {str(e)}"
@@ -167,7 +191,7 @@ async def delete_document(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Document deletion error: {str(e)}", exc_info=True)
+        print(f"Document deletion error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete document: {str(e)}"
@@ -187,7 +211,7 @@ async def list_documents(
         valid_categories = list(document_service.valid_categories)
         return {"documents": documents, "categories": valid_categories}
     except Exception as e:
-        logger.error(f"Document listing error: {str(e)}", exc_info=True)
+        print(f"Document listing error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list documents: {str(e)}"
