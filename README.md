@@ -73,7 +73,7 @@ This is a production-ready AI-powered support system for Masai School's LMS that
 ## 🏗 Architecture
 
 
-```mermaid
+```
 graph TD
     A[Student Query] --> B{Routing Agent}
     B --> C{Cache Check (Redis)}
