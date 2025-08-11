@@ -72,11 +72,6 @@ This is a production-ready AI-powered support system for Masai School's LMS that
 
 ## 🏗 Architecture
 
-### High-Level Overview
-- **Frontend (Next.js)** – UI for students & admins.  
-- **Backend (FastAPI)** – API, authentication, ticket handling.  
-- **AI Core (LangChain/LangGraph)** – Query processing, retrieval, decision-making.  
-- **Databases:** MongoDB, Pinecone, Redis.  
 
 ```mermaid
 graph TD
@@ -110,20 +105,16 @@ graph TD
 * **Vector DB:** Pinecone
 * **Cache/Analytics:** Redis
 * **AI Frameworks:** LangChain, LangGraph
-* **LLM:** Google Generative AI (Gemini 2.0 Flash)
+* **LLM:** Google Generative AI (Gemini 2.5 Flash)
 * **Embeddings:** HuggingFace `all-mpnet-base-v2`
 * **Document Processing:** unstructured.io, pandas, pdfminer.six, pytesseract
-* **Auth:** passlib, python-jose
-* **Deployment:** Docker, Railway
+
 
 
 💻 Frontend
 
 * **Framework:** Next.js 14 (React, TypeScript)
 * **Styling:** Tailwind CSS + Shadcn/ui
-* **HTTP Client:** axios
-* **Auth:** js-cookie, jwt-decode
-* **Deployment:** Railway
 
 
 ---
@@ -156,8 +147,10 @@ PINECONE_API_KEY="YOUR_PINECONE_API_KEY"
 PINECONE_ENVIRONMENT="YOUR_PINECONE_ENVIRONMENT"
 
 # Index & Collection Maps
-PINECONE_INDEX_MAP='{"qa_documents": "qa-documents-index"}'
-MONGO_COLLECTION_MAP='{"qa_documents": "qa_documents_meta"}'
+PINECONE_INDEX_MAP='{"program_details_documents": "program-details-documents", "qa_documents": "qa-documents", "curriculum_documents": "curriculum-documents"}'
+
+MONGO_COLLECTION_MAP='{"program_details_documents": "program_details_documents", "qa_documents": "qa_documents", "curriculum_documents": "curriculum_documents"}'
+
 
 # App Config
 ENVIRONMENT="development"
@@ -199,6 +192,7 @@ echo 'NEXT_PUBLIC_API_BASE="http://localhost:8000"' > .env.local
 uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Frontend
+cd frontend
 npm run dev
 ```
 
@@ -224,6 +218,11 @@ npm run dev
 
 1. Login as admin
 2. Manage tickets and documents
+   #### Adding New Programs
+   1. Upload program-specific FAQs via admin API
+   2. Upload curriculum documents
+   3. System automatically adapts to new content
+
 3. Respond or escalate tickets
 4. View analytics dashboard
 
@@ -237,6 +236,7 @@ npm run dev
 ### Authentication
 - `POST /v1/auth/login` - User login
 - `POST /v1/auth/logout` - User logout
+-  `GET /me` - Get current user information
 
 ### Tickets (Students)
 - `POST /v1/tickets/create` - Create new ticket
@@ -244,6 +244,9 @@ npm run dev
 - `GET /v1/tickets/{ticket_id}` - Get ticket details
 - `POST /v1/tickets/{ticket_id}/reopen` - Reopen resolved ticket
 - `POST /v1/tickets/{ticket_id}/rate` - Rate ticket resolution
+-  `POST /{ticket_id}/messages` - A user (student or admin) adds a message to an existing ticket.
+
+
 
 ### Admin Operations
 - `GET /v1/admin/tickets` - List tickets for admin
@@ -251,7 +254,8 @@ npm run dev
 - `POST /v1/admin/documents/upload` - Upload knowledge base document
 - `DELETE /v1/admin/documents/{doc_id}` - Delete document
 - `GET /v1/admin/documents` - List documents
-
+- ` POST /v1/admin/tickets/{ticket_id}/resolve` - Admin Resolves a ticket
+- `GET /v1/admin/analytics`
 
 ---
 
@@ -260,6 +264,9 @@ npm run dev
 ### Test Credentials
 - **Student**: student1@masaischool.com / password123
 - **Admin**: ec1@masaischool.com / admin123
+
+- **Student**: student2@masaischool.com / password123
+- **Admin**: ec2@masaischool.com / admin123
 
 ### API Documentation
 Once the server is running, visit:
@@ -291,31 +298,10 @@ GET /v1/tickets/my_tickets
 
 ## 📈 Performance Metrics
 
-- **Response Time**: <2 seconds for cached queries, <5 seconds for new queries
+- **Response Time**: 3-5 seconds for cached queries, 8-10 seconds for new queries
 - **Automation Rate**: 70-80% of tickets resolved without human intervention
-- **Confidence Threshold**: 85% for automatic resolution
-- **Cache Hit Rate**: ~40% after initial training period
 - **Escalation Rate**: 20-30% for complex or unclear queries
 
-## 🔧 Configuration
-
-### Environment Variables
-```env
-# Required
-GOOGLE_API_KEY=your_gemini_api_key
-MONGODB_URL=mongodb://localhost:27017/lms_support
-
-# Recommended
-PINECONE_API_KEY=your_pinecone_key
-PINECONE_INDEX_NAME=lms-support-index
-REDIS_URL=redis://localhost:6379/0
-```
-
-### Adding New Programs
-1. Upload program-specific FAQs via admin API
-2. Upload curriculum documents
-3. Update program metadata in database
-4. System automatically adapts to new content
 
 ## 🐛 Troubleshooting
 
@@ -370,12 +356,17 @@ Intelligent_lms_support/
 * Granular analytics
 * Real-time notifications
 * Multi-language support
+* Suggested Response Button for Admins
+* Student Data – Should include course details and be provided to the LLM during processing.
+* Attachments in Tickets – Enable uploading and viewing of related files.
+* Tags for Metadata of Documents – Allow tagging for easier organization and search.
+* Live Updates – Implement via WebSockets or Socket.io
 
 ---
 
 ## 📜 License
 
-This project is developed for Masai School as part of the LMS Support System initiative.
+This project is developed for Masai School as part of the Improving the LMS Support System initiative.
 
 ---
 
