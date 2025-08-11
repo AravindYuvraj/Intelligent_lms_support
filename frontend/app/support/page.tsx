@@ -174,8 +174,6 @@ export default function SupportPage() {
                             </span>
                           </div>
                           <span>•</span>
-                          <span>{ticket.assigned_to || "Unassigned"}</span>
-                          <span>•</span>
                           <span>
                             Last Updated on{" "}
                             {formatTimestamp(

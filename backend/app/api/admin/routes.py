@@ -87,6 +87,29 @@ async def resolve_ticket(
     new_status = TicketStatus.RESOLVED.value
     ticket_service.update_ticket_status(ticket_id, new_status, current_user["id"])
     
+    try:
+        # Get original query from first conversation
+        conversations = conversation_service.get_ticket_conversations(ticket_id)
+        original_conv = next((c for c in conversations if c["sender_role"] == "student"), None)
+        
+        last_admin_msg = None
+        for c in reversed(conversations):  # reverse so we get latest first
+            if c["sender_role"] == "admin":
+                last_admin_msg = c["message"]
+                break
+        print('Last admin msg being cached', original_conv["message"], last_admin_msg)
+        if original_conv and last_admin_msg:
+            from backend.app.agents.cache_service import SemanticCacheService
+            cache_service = SemanticCacheService()
+            await cache_service.store_response(
+                query=original_conv["message"],
+                response=last_admin_msg,
+                confidence=0.95,  # High confidence for human responses
+                category=ticket["category"]
+            )
+    except Exception as e:
+        logger.error(f"Error storing admin response in cache: {str(e)}")
+    
     # Add conversation entry
     conversation_service.create_conversation(
         ticket_id=ticket_id,
@@ -94,23 +117,6 @@ async def resolve_ticket(
         sender_id=current_user["id"],
         message=message
     )
-    
-    try:
-        # Get original query from first conversation
-        conversations = conversation_service.get_ticket_conversations(ticket_id)
-        original_conv = next((c for c in conversations if c["sender_role"] == "student"), None)
-        
-        if original_conv:
-            from backend.app.agents.cache_service import SemanticCacheService
-            cache_service = SemanticCacheService()
-            await cache_service.store_response(
-                query=original_conv["message"],
-                response=message,
-                confidence=0.95,  # High confidence for human responses
-                category=ticket["category"]
-            )
-    except Exception as e:
-        logger.error(f"Error storing admin response in cache: {str(e)}")
     
     if status == "Resolved":
         analytics_service.log_event('human_resolved', {'category': ticket.get("category")})
