@@ -53,7 +53,8 @@ class UserService(MongoBaseService):
         super().__init__()
         self.collection = self.db.users
     
-    def create_user(self, email: str, password_hash: str, role: str, user_type: Optional[str] = None) -> str:
+    def create_user(self, email: str, password_hash: str, role: str, user_type: Optional[str] = None, 
+                   course_category: Optional[str] = None, course_name: Optional[str] = None) -> str:
         """Create a new user"""
         user_doc = {
             "email": email,
@@ -63,6 +64,10 @@ class UserService(MongoBaseService):
         }
         if user_type:
             user_doc["type"] = user_type
+        if course_category:
+            user_doc["course_category"] = course_category
+        if course_name:
+            user_doc["course_name"] = course_name
         
         result = self.collection.insert_one(user_doc)
         return str(result.inserted_id)

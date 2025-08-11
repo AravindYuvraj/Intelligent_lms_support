@@ -10,6 +10,10 @@ class AgentState(TypedDict):
     subcategory_data: Optional[Dict[str, Any]]
     attachments: Optional[List[str]]
     
+    # User course information
+    user_course_category: Optional[str]
+    user_course_name: Optional[str]
+    
     # Workflow state
     current_step: str
     confidence_score: Optional[float]
