@@ -1,27 +1,44 @@
 # Intelligent LMS Support System
-**Production-Ready Automated Support Ticket Resolution Using Agentic RAG with LangChain & LangGraph**
 
-## 🚀 Quick Start
 
-```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd Intelligent_lms_support
 
-# 2. Run the automated setup script
-python setup_and_test.py
+# 🚀 Intelligent LMS Support System
 
-# This will:
-# - Check Python version (3.8+ required)
-# - Set up .env configuration
-# - Install all dependencies
-# - Initialize databases
-# - Load sample data
-# - Test the system
-# - Optionally start the server
-```
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
+[![Node.js Version](https://img.shields.io/badge/Node.js-18%2B-green?logo=node.js)](https://nodejs.org/)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js-black?logo=next.js)](https://nextjs.org/)
+[![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?logo=mongodb)](https://www.mongodb.com/)
+[![Pinecone](https://img.shields.io/badge/Vector%20DB-Pinecone-64B5F6?logo=pinecone)](https://www.pinecone.io/)
+[![LangChain](https://img.shields.io/badge/AI%20Framework-LangChain-007BFF?logo=langchain)](https://www.langchain.com/)
+[![LangGraph](https://img.shields.io/badge/AI%20Orchestration-LangGraph-FF5722?logo=langgraph)](https://langchain-ai.github.io/langgraph/)
 
-## 📋 Project Overview
+---
+
+
+## 📚 Table of Contents
+1. [Introduction](#-introduction)  
+2. [Features](#-features)  
+3. [Architecture](#-architecture)  
+4. [Technology Stack](#-technology-stack)  
+5. [Getting Started](#-getting-started)  
+6. [Usage](#-usage)  
+7. [API Endpoints](#-api-endpoints)  
+8. [Project Structure](#-project-structure)  
+9. [Future Enhancements](#-future-enhancements)  
+10. [Contributing](#-contributing)  
+11. [License](#-license)  
+12. [Contact](#-contact)  
+
+---
+
+## 📝 Introduction
+
+The **Intelligent LMS Support System** is an **AI-powered ticketing solution** for Learning Management Systems that:  
+- Automates student query resolution.  
+- Retrieves knowledge from a centralized database.  
+- Escalates complex cases to human admins.  
 
 This is a production-ready AI-powered support system for Masai School's LMS that automates 70-80% of support ticket resolution using:
 
@@ -33,19 +50,33 @@ This is a production-ready AI-powered support system for Masai School's LMS that
 - **Redis**: High-performance semantic caching
 - **FastAPI**: Modern, fast web framework for building APIs
 
-### Key Features
-- ✅ **70%+ Automation Rate**: Automatically resolves common student queries
-- ✅ **Multi-Agent Architecture**: Specialized agents for routing, retrieval, response, and escalation
-- ✅ **Semantic Caching**: Reduces response time and API costs
-- ✅ **Confidence-Based Escalation**: Routes complex queries to human admins
-- ✅ **Modular Design**: Easy to add new programs and knowledge bases
-- ✅ **Production Ready**: Error handling, logging, and monitoring built-in
+---
 
-## 🏗️ System Architecture
+## ✨ Features
 
-This project leverages a multi-agentic RAG (Retrieval-Augmented Generation) architecture orchestrated by LangGraph to efficiently handle student queries and automate ticket resolution. The system features distinct user roles for students and admins (EC/IA), each with a dedicated set of functionalities.
 
-### Overall Architecture Flow
+- 🤖 **AI-Powered Ticket Resolution** – Automated, accurate responses.  
+- 📚 **Contextual Understanding** – Retrieval-Augmented Generation (RAG).  
+- ⚡ **Semantic Caching** – Faster repeated queries.  
+- 🆘 **Intelligent Escalation** – Human handoff when needed.  
+- 👤 **Role-Based Access Control** – Student/Admin separation.  
+- 🗂 **Knowledge Base Management**  
+  - Document ingestion (PDF, Excel, CSV, etc.)  
+  - Categorization  
+  - Listing & deletion tools  
+- 📊 **Analytics Dashboard** – Automation rates, agent performance.  
+- 🔄 **Modular & Scalable** – Easy to add new programs and knowledge bases.
+- 🎨 **User-Friendly UI** – Intuitive design for all roles.  
+
+---
+
+## 🏗 Architecture
+
+### High-Level Overview
+- **Frontend (Next.js)** – UI for students & admins.  
+- **Backend (FastAPI)** – API, authentication, ticket handling.  
+- **AI Core (LangChain/LangGraph)** – Query processing, retrieval, decision-making.  
+- **Databases:** MongoDB, Pinecone, Redis.  
 
 ```mermaid
 graph TD
@@ -66,120 +97,142 @@ graph TD
     N --> O[Admin Response]
     O --> P[Update Cache & KB]
     P --> E
-```
+````
 
-### Multi-Agent System Details
+---
 
-1.  **Routing Agent**:
-    *   **Purpose**: Initial processing of student queries.
-    *   **Functions**: Performs semantic search on Redis cache for similar queries, decomposes unclear queries, and triages queries for EC or IA admins.
+## 🛠 Technology Stack
 
-2.  **Retriever Agent**:
-    *   **Purpose**: Finds relevant information from the knowledge base.
-    *   **Functions**: Searches the Pinecone vector database for top-k relevant chunks, re-ranks retrieved chunks based on context and past ticket ratings.
+🖥 Backend
 
-3.  **Response Agent**:
-    *   **Purpose**: Generates responses to student queries.
-    *   **Functions**: Uses the user's query and retrieved context to generate a response, assigns a confidence score to the generated response.
+* **Framework:** FastAPI (Python 3.11+)
+* **DB:** MongoDB (pymongo)
+* **Vector DB:** Pinecone
+* **Cache/Analytics:** Redis
+* **AI Frameworks:** LangChain, LangGraph
+* **LLM:** Google Generative AI (Gemini 2.0 Flash)
+* **Embeddings:** HuggingFace `all-mpnet-base-v2`
+* **Document Processing:** unstructured.io, pandas, pdfminer.six, pytesseract
+* **Auth:** passlib, python-jose
+* **Deployment:** Docker, Railway
 
-4.  **Escalation Agent**:
-    *   **Purpose**: Handles human handoffs for complex or low-confidence queries.
-    *   **Functions**: Notifies relevant EC or IA admins, provides suggested responses, and updates ticket status to "Action Required."
 
-## 🗄️ Data Sources and Formats
+💻 Frontend
 
-### Database Schemas
+* **Framework:** Next.js 14 (React, TypeScript)
+* **Styling:** Tailwind CSS + Shadcn/ui
+* **HTTP Client:** axios
+* **Auth:** js-cookie, jwt-decode
+* **Deployment:** Railway
 
-*   **PostgreSQL**: Primary transactional database for user and ticket metadata.
-    *   `users` table: `id`, `email`, `password_hash`, `role` (`student`/`admin`), `created_at`.
-    *   `tickets` table: `id`, `user_id`, `category`, `status`, `title`, `message`, `created_at`, `assigned_to` (`admin_id`), `rating`.
-    *   `conversations` table: `id`, `ticket_id`, `sender_role` (`student`/`agent`/`admin`), `message`, `timestamp`.
 
-*   **MongoDB**: Document storage for knowledge base categories.
-    *   Each knowledge base category (e.g., `product_support`, `leave`) has its own collection.
-    *   Example: `product_support` collection: `doc_id`, `file_name`, `content`, `metadata` (e.g., `category`, `source_url`), `created_at`.
+---
 
-### Knowledge Base Structure
-
-The system uses distinct knowledge base categories, each mapped to a MongoDB collection and indexed in Pinecone:
-
-| Category            | MongoDB Collection         | Content Type                       |
-| :------------------ | :------------------------- | :--------------------------------- |
-| **Program Details** | `program_details_documents` | Course info, schedules, policies   |
-| **Q&A**             | `qa_documents`             | FAQs, troubleshooting, common issues |
-| **Curriculum Documents** | `curriculum_documents`     | Technical content, assignments, evaluations |
-
-### Caching and Vector Storage
-
-*   **Redis**: Used for semantic caching of previously resolved queries and their responses to improve efficiency and reduce LLM calls.
-*   **Pinecone**: The vector database stores embeddings of knowledge base documents, enabling semantic search for relevant information during retrieval.
-
-## ➕ Instructions to Add New Programs / Knowledge Bases
-
-To extend the system with new programs or knowledge base categories, follow these steps:
-
-1.  **Define New Category**: Determine the name and purpose of your new knowledge base category (e.g., `admissions_info`).
-
-2.  **MongoDB Collection**: A new collection will automatically be created in MongoDB when documents for this category are first uploaded via the admin interface.
-
-3.  **Prepare Documents**: Gather the relevant documents (text, PDFs, etc.) for the new program/category. Ensure they are clean and well-structured for optimal embedding.
-
-4.  **Upload via Admin Interface**: Use the `/admin/documents/upload` API endpoint (or the corresponding UI if implemented) to upload documents for the new category. The system will automatically:
-    *   Store the documents in the designated MongoDB collection.
-    *   Generate embeddings for the document content using the Gemini embedding model.
-    *   Upsert these embeddings into the Pinecone vector database, associated with the new category.
-
-5.  **Update Routing Agent (if necessary)**: If the new program introduces a distinct type of query that the Routing Agent needs to specifically identify or triage, you might need to update the LLM's prompt or fine-tune the agent's logic to recognize and route these new query types correctly.
-
-6.  **Test Retrieval**: After uploading, test the system by submitting queries related to the new program/category to ensure the Retriever Agent can accurately find and utilize the newly added information.
-
-By following these steps, the new program's information will be integrated into the RAG system, allowing the agents to retrieve and respond to related student queries effectively.
-
-## 🛠️ Manual Setup
+## 🚀 Getting Started
 
 ### Prerequisites
-- Python 3.8+
-- MongoDB (local or cloud)
-- Redis (optional, for caching)
-- API Keys:
-  - Google Gemini API (free): https://makersuite.google.com/app/apikey
-  - Pinecone (free tier): https://www.pinecone.io/
 
-### Step-by-Step Installation
+* Python 3.11+
+* Node.js 18+
+* MongoDB & Redis instances
+* Google API Key
+* Pinecone API Key
 
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+### Environment Variables
 
-# 2. Configure environment variables
-cp .env.example .env
-# Edit .env and add your API keys:
-# - GOOGLE_API_KEY=your_gemini_key
-# - PINECONE_API_KEY=your_pinecone_key
-# - MONGODB_URL=mongodb://localhost:27017/lms_support
-# - REDIS_URL=redis://localhost:6379/0
+<details>
+<summary>📄 Click to view .env example</summary>
 
-# 3. Initialize database with sample users
-python backend/app/db/init_db.py
+```env
+# Database
+MONGODB_URL="mongodb://localhost:27017/lms_support"
+REDIS_URL="redis://localhost:6379"
 
-# 4. Ingest sample FAQs and documents
-python backend/app/scripts/ingest_data.py
+# Google AI
+GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
 
-# 5. Start the server
-python run.py
+# Pinecone
+PINECONE_API_KEY="YOUR_PINECONE_API_KEY"
+PINECONE_ENVIRONMENT="YOUR_PINECONE_ENVIRONMENT"
+
+# Index & Collection Maps
+PINECONE_INDEX_MAP='{"qa_documents": "qa-documents-index"}'
+MONGO_COLLECTION_MAP='{"qa_documents": "qa_documents_meta"}'
+
+# App Config
+ENVIRONMENT="development"
+DEBUG=True
+SESSION_SECRET_KEY="YOUR_SECRET"
 ```
 
-## 📊 Knowledge Base Structure
+</details>
 
-The system uses 3 main knowledge base categories:
+---
 
-| Category | MongoDB Collection | Content Type |
-|----------|-------------------|--------------|
-| **Program Details** | `program_details_documents` | Course info, schedules, policies |
-| **Q&A** | `qa_documents` | FAQs, troubleshooting, common issues |
-| **Curriculum Documents** | `curriculum_documents` | Technical content, assignments, evaluations |
+## ▶ Installation
 
-## 🔌 API Endpoints
+#### Backend
+
+```bash
+cd Intelligent_lms_support
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+pip install uv
+uv sync
+python backend/app/db/init_db.py
+```
+
+#### Frontend
+
+```bash
+cd frontend
+npm install  # or pnpm install
+echo 'NEXT_PUBLIC_API_BASE="http://localhost:8000"' > .env.local
+```
+
+---
+
+## 🏃 Running the Application
+
+```bash
+# Backend
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Frontend
+npm run dev
+```
+
+* Backend: [http://localhost:8000](http://localhost:8000)
+* Frontend: [http://localhost:3000](http://localhost:3000)
+
+---
+
+## 🎯 Usage
+
+<details>
+<summary>👨‍🎓 Student Flow</summary>
+
+1. Visit `http://localhost:3000`
+2. Login as student
+3. Create, track, and manage tickets
+4. Reopen or rate resolved tickets
+
+</details>
+
+<details>
+<summary>🛠 Admin Flow</summary>
+
+1. Login as admin
+2. Manage tickets and documents
+3. Respond or escalate tickets
+4. View analytics dashboard
+
+</details>
+
+---
+
+## 📡 API Endpoints
+
 
 ### Authentication
 - `POST /v1/auth/login` - User login
@@ -198,6 +251,9 @@ The system uses 3 main knowledge base categories:
 - `POST /v1/admin/documents/upload` - Upload knowledge base document
 - `DELETE /v1/admin/documents/{doc_id}` - Delete document
 - `GET /v1/admin/documents` - List documents
+
+
+---
 
 ## 🧪 Testing
 
@@ -280,8 +336,10 @@ REDIS_URL=redis://localhost:6379/0
 4. **Cache Not Working**
    - Install and start Redis
    - Check Redis connection URL
+---
+## 📂 Project Structure
 
-## 📚 Project Structure
+
 ```
 Intelligent_lms_support/
 ├── backend/
@@ -290,7 +348,7 @@ Intelligent_lms_support/
 │       │   ├── langgraph_workflow.py  # Enhanced LangGraph workflow
 │       │   ├── routing_agent.py
 │       │   ├── retriever_agent.py
-│       │   ├── response_agent.py
+│       │   |
 │       │   └── escalation_agent.py
 │       ├── api/             # FastAPI routes
 │       ├── core/            # Configuration and security
@@ -302,27 +360,32 @@ Intelligent_lms_support/
 ├── .env                     # Environment configuration
 ├── requirements.txt         # Python dependencies
 ├── run.py                  # Main application entry
-└── setup_and_test.py       # Automated setup script
 ```
 
-## 🤝 Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+## 🔮 Future Enhancements
 
-## 📝 License
+* LLM fine-tuning with feedback loop
+* Granular analytics
+* Real-time notifications
+* Multi-language support
+
+---
+
+## 📜 License
 
 This project is developed for Masai School as part of the LMS Support System initiative.
 
-## 🆘 Support
+---
 
-For issues or questions:
-- Check the troubleshooting section
-- Review API documentation at `/docs`
-- Contact the development team
+## 📬 Contact
+
+** Aravind Yuraj / Team **
+📧 [your.email@example.com](mailto:your.email@example.com)
+🔗 [GitHub Profile](https://github.com/your-github-profile)
+
+```
 
 ---
 

@@ -9,7 +9,7 @@ class EscalationAgent:
     def __init__(self):
         pass
     
-    async def _find_available_admin( admin_type: str) -> Dict[str, Any]:
+    async def _find_available_admin( self, admin_type: str) -> Dict[str, Any]:
         """
         Finds an available admin.
         In a real system, this would check for load, online status, and specialty.
