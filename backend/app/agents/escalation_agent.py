@@ -48,7 +48,7 @@ class EscalationAgent:
             )
 
             # 3. Create a predefined message for the student
-            student_message = state.get("response", f"Thank you for contacting support. Your query has been forwarded to your {admin_type}. They will review your request and get back to you soon with a detailed response.")
+            student_message = ( state.get("response") or f"Thank you for contacting support. Your query is under review. We will get back to you soon with a detailed response.")           
             print("student msg adding to conversaion:", student_message, state.get("response"))
             conversation_service.create_conversation(
                 ticket_id=ticket_id,

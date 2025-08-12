@@ -210,16 +210,17 @@ class EnhancedLangGraphWorkflow:
             
             messages = []
             for conv in conversations:
+                message_content = conv["message"] if conv["message"] is not None else "[Message content not available]"
                 if conv["sender_role"] == "student":
-                    messages.append(HumanMessage(content=conv["message"]))
+                    messages.append(HumanMessage(content=message_content))
                 else:
                     # Assuming 'agent' or 'support' roles are the AI
-                    messages.append(AIMessage(content=conv["message"]))
+                    messages.append(AIMessage(content=message_content))
             print("Updating state category", ticket["category"])
             print(f"User course info: {user_course_category} - {user_course_name}")
             state.update({
                 "user_id": str(ticket["user_id"]),
-                "original_query": conversations[-1]['message'], # The latest message is the current query
+                "original_query": conversations[-1]['message'] if conversations and conversations[-1] and 'message' in conversations[-1] else "No original query available", # The latest message is the current query
                 "category": ticket["category"],
                 "user_course_category": user_course_category,
                 "user_course_name": user_course_name,
