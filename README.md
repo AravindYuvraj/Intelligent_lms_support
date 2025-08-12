@@ -236,7 +236,6 @@ npm run dev
 
 ## 📡 API Endpoints
 
-
 ### Authentication
 - `POST /v1/auth/login` - User login
 - `POST /v1/auth/logout` - User logout
@@ -327,8 +326,8 @@ GET /v1/tickets/my_tickets
    - Install and start Redis
    - Check Redis connection URL
 ---
-## 📂 Project Structure
 
+## 📂 Project Structure
 
 ```
 Intelligent_lms_support/
@@ -382,7 +381,3 @@ This project is developed for Masai School as part of the Improving the LMS Supp
 🔗 [GitHub Profile](https://github.com/kini99)
 
 ```
-
----
-
-**Built with ❤️ using LangChain, LangGraph, and modern AI technologies**
