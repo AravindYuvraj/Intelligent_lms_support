@@ -87,6 +87,9 @@ async def resolve_ticket(
     # Update ticket status to Resolved
     new_status = TicketStatus.RESOLVED.value
     ticket_service.update_ticket_status(ticket_id, new_status, current_user["id"])
+
+    # Log human resolved event
+    analytics_service.log_event("human_resolved")
     
     try:
         # Get original query from first conversation
@@ -132,7 +135,7 @@ async def resolve_ticket(
                 metadata_list=[{
                     "potential_response": last_admin_msg
                 }],
-                course_category=[user_course_category],
+                course_categories=[user_course_category],
                 course_names=[user_course_name]
             )
 
