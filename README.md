@@ -17,6 +17,14 @@
 ---
 
 
+# Deployed Links
+
+### Frontend:
+https://intelligent-lms-support-ppfz.vercel.app/
+
+### Backend: 
+https://masaischool.duckdns.org/
+
 ## 📚 Table of Contents
 1. [Introduction](#-introduction)  
 2. [Features](#-features)  
@@ -148,9 +156,7 @@ PINECONE_ENVIRONMENT="YOUR_PINECONE_ENVIRONMENT"
 
 # Index & Collection Maps
 PINECONE_INDEX_MAP='{"program_details_documents": "program-details-documents", "qa_documents": "qa-documents", "curriculum_documents": "curriculum-documents"}'
-
 MONGO_COLLECTION_MAP='{"program_details_documents": "program_details_documents", "qa_documents": "qa_documents", "curriculum_documents": "curriculum_documents"}'
-
 
 # App Config
 ENVIRONMENT="development"
@@ -183,7 +189,6 @@ npm install  # or pnpm install
 echo 'NEXT_PUBLIC_API_BASE="http://localhost:8000"' > .env.local
 ```
 
----
 
 ## 🏃 Running the Application
 
@@ -208,7 +213,7 @@ npm run dev
 
 1. Visit `http://localhost:3000`
 2. Login as student
-3. Create, track, and manage tickets
+3. Create and track tickets
 4. Reopen or rate resolved tickets
 
 </details>
@@ -219,11 +224,10 @@ npm run dev
 1. Login as admin
 2. Manage tickets and documents
    #### Adding New Programs
-   1. Upload program-specific FAQs via admin API
-   2. Upload curriculum documents
-   3. System automatically adapts to new content
-
-3. Respond or escalate tickets
+   1. Choose a category for the document with help of category guide provided
+   2. Select categories and courses to which document is applicable
+   3. Upload the document (Might take few minutes to process)
+3. Respond to escalated tickets
 4. View analytics dashboard
 
 </details>
@@ -246,15 +250,13 @@ npm run dev
 - `POST /v1/tickets/{ticket_id}/rate` - Rate ticket resolution
 -  `POST /{ticket_id}/messages` - A user (student or admin) adds a message to an existing ticket.
 
-
-
 ### Admin Operations
 - `GET /v1/admin/tickets` - List tickets for admin
 - `POST /v1/admin/tickets/{ticket_id}/respond` - Admin response
 - `POST /v1/admin/documents/upload` - Upload knowledge base document
 - `DELETE /v1/admin/documents/{doc_id}` - Delete document
 - `GET /v1/admin/documents` - List documents
-- ` POST /v1/admin/tickets/{ticket_id}/resolve` - Admin Resolves a ticket
+- `POST /v1/admin/tickets/{ticket_id}/resolve` - Admin Resolves a ticket
 - `GET /v1/admin/analytics`
 
 ---
@@ -263,10 +265,12 @@ npm run dev
 
 ### Test Credentials
 - **Student**: student1@masaischool.com / password123
-- **Admin**: ec1@masaischool.com / admin123
-
 - **Student**: student2@masaischool.com / password123
+- **Student**: student3@masaischool.com / password123
+- **Admin**: ec1@masaischool.com / admin123
 - **Admin**: ec2@masaischool.com / admin123
+- **Admin**: ia1@masaischool.com / admin123
+- **Admin**: ia2@masaischool.com / admin123
 
 ### API Documentation
 Once the server is running, visit:
@@ -317,7 +321,7 @@ GET /v1/tickets/my_tickets
 
 3. **Import Errors**
    - Run `pip install -r requirements.txt` again
-   - Check Python version (3.8+ required)
+   - Check Python version (3.9+ required)
 
 4. **Cache Not Working**
    - Install and start Redis
@@ -352,15 +356,12 @@ Intelligent_lms_support/
 
 ## 🔮 Future Enhancements
 
-* LLM fine-tuning with feedback loop
-* Granular analytics
-* Real-time notifications
-* Multi-language support
-* Suggested Response Button for Admins
-* Student Data – Should include course details and be provided to the LLM during processing.
-* Attachments in Tickets – Enable uploading and viewing of related files.
-* Tags for Metadata of Documents – Allow tagging for easier organization and search.
-* Live Updates – Implement via WebSockets or Socket.io
+* Support for attachments in tickets.
+* Suggest response to query option for admins.
+* Tags for metadata of documents for easier organization and search.
+* Live updates/notifications for escalations and responses.
+* LLM fine-tuning with feedback loop.
+* Granular analytics.
 
 ---
 
