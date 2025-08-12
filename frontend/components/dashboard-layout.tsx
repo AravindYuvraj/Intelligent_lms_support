@@ -154,14 +154,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <div className="flex items-center space-x-2">
-                    {" "}
-                    {/* Added a new div for the name and avatar */}
-                    {userEmail && (
-                      <span className="text-sm font-medium text-gray-700">
-                        {userEmail.split("@")[0]}
-                      </span>
-                    )}
+                  <div className="flex items-center space-x-2"> 
                     <Button
                       variant="ghost"
                       className="relative h-8 w-8 rounded-full"
@@ -176,6 +169,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         </AvatarFallback>
                       </Avatar>
                     </Button>
+                    {userEmail && (
+                      <span className="text-sm font-medium text-gray-700">
+                        {userEmail.split("@")[0]}
+                      </span>
+                    )}
                   </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>

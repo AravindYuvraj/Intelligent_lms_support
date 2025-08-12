@@ -77,7 +77,12 @@ class EnhancedLangGraphWorkflow:
             model="gemini-2.5-flash",
             google_api_key=settings.GOOGLE_API_KEY,
             temperature=0.1,
-            # Instruct the model to return JSON
+            model_kwargs={"response_mime_type": "application/json"}
+        )
+        self.query_rewriter_llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=settings.GOOGLE_API_KEY,
+            temperature=0.1,
             model_kwargs={"response_mime_type": "application/json"}
         )
         self.cache_service = SemanticCacheService()
@@ -285,8 +290,8 @@ class EnhancedLangGraphWorkflow:
             Respond with a single, optimized 
          query."""
         else: # program_details_documents
-            prompt_text = """You are an expert search query creator. Your task is to rewrite a user's question into a highly effective search query optimized for a program policy and timeline knowledge base.
-            Focus on extracting keywords related to deadlines, deliverables, policies (like attendance, leave), program phases, or specific event names.
+            prompt_text = """You are an expert search query creator. Your task is to rewrite a user's question into a highly effective search query optimized for a program policy, timeline and FAQ knowledge base.
+            Focus on extracting keywords in the query. If the user query is not in proper english, understand the query and respond with an effective search query in english with keywords.
             
             User question: {query}
             
@@ -297,7 +302,7 @@ class EnhancedLangGraphWorkflow:
             ("human", "Rewrite the following user question: {query}")
         ])
         
-        rewriter_chain = prompt | self.llm.with_structured_output(RewrittenQuery)
+        rewriter_chain = prompt | self.query_rewriter_llm.with_structured_output(RewrittenQuery)
 
         try:
             result = await rewriter_chain.ainvoke({"query": original_query})
@@ -360,8 +365,8 @@ class EnhancedLangGraphWorkflow:
         print(f"GENERATE AND DECIDE for ticket {state['ticket_id']}, {state['messages']}")
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are 'Masai Agent', an AI support expert for Masai School. 
-Your task is to analyze the user's query and available context to make a single, definitive decision.
+            ("system", """You are a support expert for Masai School.
+Your task is to analyze the student's query and available context to make a single, definitive decision.
 
 IMPORTANT:
 - The KB context contains fragments from past cases.  
@@ -382,6 +387,11 @@ IMPORTANT:
    b. **escalate:** If the query is too complex, sensitive, or requires a manual action you can't perform, choose this. You MUST provide a clear `escalation_reason`.
    c. **respond:** If you have enough context to fully and accurately answer, choose this. You MUST generate a helpful and complete `response` in your own words.
 
+**Note:**
+1. Note that for students you are the EC or IA. They do not know you are an agent so form your response statement accordingly.
+2. In case student is required to submit or share any documents or information, consider choosing request_info if it appropriate for the situation.
+3. If student has given any supporting documents or information which needs to be checked and confirmed by admin, consider choosing escalate.
+
 **Output Format:**
 Respond ONLY with 1 valid JSON object matching the `AgentDecision` schema as follows. Do not add explanations or markdown or any Markdown fences (```json ...``` or ```).
 IMPORTANT: Output must be exactly one JSON object. 
@@ -390,9 +400,8 @@ Do not output multiple decision objects.
 If you output anything else, it will cause a system error.
 {{
   "decision": "respond" | "request_info" | "escalate",
-  "response": "Your generated response here. Null if not applicable.", // Must be rewritten in your own words, no direct copy from KB, Start the response with a sweet message like "Dear student,
-Thank you for reaching out to us. Supporting our students is our highest priority. 😊
-" and end it with "Thanks and Regards.". DO NOT INCLUDE personal details of any person like name, contact, etc.
+  "response": "Your generated response here. Null if not applicable.", // Must be rewritten in your own words, no direct copy from KB, Start the response with a sweet message like "Dear student, 
+Thank you for reaching out to us. Supporting our students is our highest priority. 😊" and end it with "Thanks and Regards.". DO NOT INCLUDE personal details of any person like name, contact, etc. 
   "missing_info": ["List of questions or items needed. Null if not applicable."],
   "escalation_reason": "Reason for escalation. Null if not applicable.",
   "admin_type": "EC" | "IA",
@@ -482,6 +491,7 @@ Make your decision.
             if action == 'request_info' and decision.get('missing_info'):
                 print("Action: Requesting info from student.", decision.get("admin_type", "EC"), {state['agent_decision']['admin_type']})
                 message = decision.get('response', "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info']))
+                print("msg adding to conversaion:", message, decision.get('response'))
                 conversation_service.create_conversation(ticket_id, "agent", message, confidence_score=confidence)
                 
                 admin = await self._find_available_admin(decision.get("admin_type", "EC"))
@@ -494,7 +504,7 @@ Make your decision.
             # Outcome 2: Escalate to a human admin
             elif action == 'escalate':
                 print(f"Action: Escalating to human admin ({decision.get('admin_type')}).")
-                analytics_service.log_event('escalated', {'category': category}) # Added
+                analytics_service.log_event('escalated', {'category': category})
                 await self.escalation_agent.process({
                     "ticket_id": ticket_id, "admin_type": decision.get("admin_type", "EC"),
                     "response": decision.get("response", "")

@@ -2,6 +2,8 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
+from pydantic import BaseModel
+
 class TicketCreateRequest(BaseModel):
     category: str
     title: str
@@ -53,7 +55,7 @@ class ConversationResponse(BaseModel):
     ticket_id: str
     sender_role: str
     sender_id: Optional[str]
-    message: str
+    message: Optional[str] = None
     confidence_score: Optional[float]
     timestamp: datetime
     sender_email: Optional[str] = None  # For display purposes
