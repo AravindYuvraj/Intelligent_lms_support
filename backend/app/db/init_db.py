@@ -20,18 +20,23 @@ def init_database():
             logger.info("Database already initialized with users")
             return
         
-        # Create sample students
+        # Create sample students with course information
         students = [
-            {"email": "student1@masaischool.com", "password": "password123"},
-            {"email": "student2@masaischool.com", "password": "password123"},
-            {"email": "student3@masaischool.com", "password": "password123"},
+            {"email": "student1@masaischool.com", "password": "password123", 
+             "course_category": "Software Development", "course_name": "Full Stack Web Development"},
+            {"email": "student2@masaischool.com", "password": "password123", 
+             "course_category": "Data Science", "course_name": "Data Analytics Fundamentals"},
+            {"email": "student3@masaischool.com", "password": "password123", 
+             "course_category": "AI/ML", "course_name": "Machine Learning Basics"},
         ]
         
         for student_data in students:
             user_service.create_user(
                 email=student_data["email"],
                 password_hash=get_password_hash(student_data["password"]),
-                role=UserRole.STUDENT.value
+                role=UserRole.STUDENT.value,
+                course_category=student_data["course_category"],
+                course_name=student_data["course_name"]
             )
         
         # Create sample admins (EC and IA)

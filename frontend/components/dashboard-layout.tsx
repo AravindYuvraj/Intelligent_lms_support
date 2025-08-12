@@ -110,13 +110,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </nav>
       </aside>
-      
+
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <ChevronLeft className="h-5 w-5 text-gray-400" onClick={()=> router.back()} />
+              <ChevronLeft
+                className="h-5 w-5 text-gray-400"
+                onClick={() => router.back()}
+              />
               <div className="flex items-center space-x-4">
                 <Search className="h-5 w-5 text-gray-400" />
                 <input
@@ -131,10 +134,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-5 w-5" />
                 {/* {notifications > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs flex items-center justify-center">
-                    {notifications}
-                  </Badge>
-                )} */}
+          <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs flex items-center justify-center">
+            {notifications}
+          </Badge>
+        )} */}
               </Button>
 
               <Button variant="ghost" size="sm">
@@ -151,20 +154,27 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="relative h-8 w-8 rounded-full"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src="https://thumbs.dreamstime.com/b/user-profile-vector-flat-illustration-avatar-person-icon-gender-neutral-silhouette-profile-picture-user-profile-vector-flat-304778094.jpg"
-                        alt="User"
-                      />
-                      <AvatarFallback>
-                        {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
+                  <div className="flex items-center space-x-2"> 
+                    <Button
+                      variant="ghost"
+                      className="relative h-8 w-8 rounded-full"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src="https://thumbs.dreamstime.com/b/user-profile-vector-flat-illustration-avatar-person-icon-gender-neutral-silhouette-profile-picture-user-profile-vector-flat-304778094.jpg"
+                          alt="User"
+                        />
+                        <AvatarFallback>
+                          {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                    {userEmail && (
+                      <span className="text-sm font-medium text-gray-700">
+                        {userEmail.split("@")[0]}
+                      </span>
+                    )}
+                  </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuItem onClick={handleLogout}>

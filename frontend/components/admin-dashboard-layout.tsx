@@ -136,22 +136,29 @@ export default function AdminDashboardLayout({ children }: DashboardLayoutProps)
                 <FileText className="h-5 w-5" />
               </Button>
 
-              <DropdownMenu>
+               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="relative h-8 w-8 rounded-full"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src="https://thumbs.dreamstime.com/b/user-profile-vector-flat-illustration-avatar-person-icon-gender-neutral-silhouette-profile-picture-user-profile-vector-flat-304778094.jpg"
-                        alt="User"
-                      />
-                      <AvatarFallback>
-                        {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      className="relative h-8 w-8 rounded-full"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src="https://thumbs.dreamstime.com/b/user-profile-vector-flat-illustration-avatar-person-icon-gender-neutral-silhouette-profile-picture-user-profile-vector-flat-304778094.jpg"
+                          alt="User"
+                        />
+                        <AvatarFallback>
+                          {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                    {userEmail && (
+                      <span className="text-sm font-medium text-gray-700">
+                        {userEmail.split("@")[0]}
+                      </span>
+                    )}
+                  </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuItem onClick={handleLogout}>

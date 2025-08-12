@@ -40,9 +40,12 @@ class RetrieverAgent:
         ticket_id = state.get("ticket_id", "unknown")
         category = state.get("category", "N/A")
         query = state.get("rewritten_query", state["original_query"])
+        user_course_category = state.get("user_course_category")
+        user_course_name = state.get("user_course_name")
         
         print(f"RETRIEVER AGENT: Processing ticket '{ticket_id}' with query '{query}'")
         print(f"Original Category: '{category}'")
+        print(f"User Course: {user_course_category} - {user_course_name}")
 
         try:
             if not self.document_service:
@@ -68,16 +71,20 @@ class RetrieverAgent:
             search_results = await self.document_service.search_documents(
                 query=query,
                 categories=search_categories,
-                top_k=10 # Fetch a larger pool for better filtering
+                top_k=10, # Fetch a larger pool for better filtering
+                course_category=user_course_category,
+                course_name=user_course_name
             )
             print(f"Retrieved {len(search_results)} total candidate documents.")
             
             if len(search_results) == 0 and kb_category != 'qa_documents':
                 search_results = await self.document_service.search_documents(
-                query=query,
-                categories=search_categories,
-                top_k=10 # Fetch a larger pool for better filtering
-            )
+                    query=query,
+                    categories=search_categories,
+                    top_k=10, # Fetch a larger pool for better filtering
+                    course_category=user_course_category,
+                    course_name=user_course_name
+                )
                 print(f"Retrieved from backup qa_documents {len(search_results)} total candidate documents.")
                 
 

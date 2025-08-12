@@ -19,10 +19,10 @@ class SemanticCacheService:
         encode_kwargs={"normalize_embeddings": True}
         )
     
-    async def search_similar(self, query: str, threshold: float = 0.85) -> Optional[Dict[str, Any]]:
-        """Search for semantically similar queries in cache"""
+    async def search_similar(self, query: str, course_category: Optional[str], course_name: Optional[str], threshold: float = 0.65) -> Optional[Dict[str, Any]]:
+        """Search for semantically similar queries in cache, filtering by course."""
         try:
-            print(f"CACHE SEARCH: query='{query[:50]}...', threshold={threshold}")
+            print(f"CACHE SEARCH: query='{query[:50]}...', course='{course_category}/{course_name}'")
             
             retries = 3
             backoff_time = 1
@@ -56,6 +56,24 @@ class SemanticCacheService:
                         continue
                         
                     cached_data = json.loads(cached_data_str)
+                    
+                    # --- START: Course Filtering Logic ---
+                    cached_meta = cached_data.get("metadata", {})
+                    cached_course_cat = cached_meta.get("course_category")
+                    cached_course_names = cached_meta.get("course_names", [])
+
+                    # A cache entry is valid if:
+                    # 1. The cache item has NO course info (it's a general query)
+                    # 2. The cache item's course category matches the user's AND the user's course name is in the list
+                    is_course_match = (
+                        not cached_course_cat or
+                        (cached_course_cat == course_category and course_name in cached_course_names)
+                    )
+
+                    if not is_course_match:
+                        # print(f"Skipping cache item {key} due to course mismatch.")
+                        continue
+                    
                     cached_embedding = np.array(cached_data["embedding"])
                     
                     # Calculate cosine similarity
