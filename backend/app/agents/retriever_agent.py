@@ -28,9 +28,9 @@ class RetrieverAgent:
             self.document_service = None
 
                 # FIX: Define confidence thresholds as instance attributes for robustness.
-        self.HIGH_CONFIDENCE_THRESHOLD = 0.85
-        self.MEDIUM_CONFIDENCE_THRESHOLD = 0.75
-        self.MIN_HIGH_CONFIDENCE_DOCS = 3 # Minimum docs to accept the high-confidence tier
+        self.HIGH_CONFIDENCE_THRESHOLD = 0.70
+        self.MEDIUM_CONFIDENCE_THRESHOLD = 0.50
+        self.MIN_HIGH_CONFIDENCE_DOCS = 5 # Minimum docs to accept the high-confidence tier
 
     async def process(self, state: AgentState) -> AgentState:
         """
@@ -71,7 +71,7 @@ class RetrieverAgent:
             search_results = await self.document_service.search_documents(
                 query=query,
                 categories=search_categories,
-                top_k=10, # Fetch a larger pool for better filtering
+                top_k=15, # Fetch a larger pool for better filtering
                 course_category=user_course_category,
                 course_name=user_course_name
             )
@@ -81,7 +81,7 @@ class RetrieverAgent:
                 search_results = await self.document_service.search_documents(
                     query=query,
                     categories=search_categories,
-                    top_k=10, # Fetch a larger pool for better filtering
+                    top_k=15, # Fetch a larger pool for better filtering
                     course_category=user_course_category,
                     course_name=user_course_name
                 )
@@ -91,33 +91,37 @@ class RetrieverAgent:
             # 3. Apply the tiered confidence filtering logic
             selected_chunks = []
             
+            # Sort results once by score (highest first)
+            sorted_results = sorted(search_results, key=lambda x: x.get("score", 0.0), reverse=True)
+
             # Tier 1: High-Confidence
-            high_confidence_results = [r for r in search_results if r.get("score", 0) >= self.HIGH_CONFIDENCE_THRESHOLD]
+            high_confidence_results = [
+                r for r in sorted_results if r.get("score", 0) >= self.HIGH_CONFIDENCE_THRESHOLD
+            ]
             if len(high_confidence_results) >= self.MIN_HIGH_CONFIDENCE_DOCS:
                 print(f"SUCCESS: Found {len(high_confidence_results)} documents meeting high-confidence threshold ({self.HIGH_CONFIDENCE_THRESHOLD}).")
                 selected_chunks = high_confidence_results
-            
+
             # Tier 2: Medium-Confidence
             elif not selected_chunks:
-                medium_confidence_results = [r for r in search_results if r.get("score", 0) >= self.MEDIUM_CONFIDENCE_THRESHOLD]
+                medium_confidence_results = [
+                    r for r in sorted_results if r.get("score", 0) >= self.MEDIUM_CONFIDENCE_THRESHOLD
+                ]
                 if medium_confidence_results:
                     print(f"FALLBACK: Using {len(medium_confidence_results)} documents from medium-confidence threshold ({self.MEDIUM_CONFIDENCE_THRESHOLD}).")
                     selected_chunks = medium_confidence_results
-            
-            # Tier 3: Best-Effort Fallback
-            if not selected_chunks and search_results:
-                print("FALLBACK: No documents met thresholds. Using top 5 best-effort results.")
-                # We still re-rank to ensure the absolute best are at the top
-                sorted_by_score = sorted(search_results, key=lambda x: x.get("score", 0.0), reverse=True)
-                selected_chunks = sorted_by_score[:5]
 
+            # Tier 3: Best-Effort Fallback
+            if not selected_chunks and sorted_results:
+                print("FALLBACK: No documents met thresholds. Using top 5 best-effort results.")
+                selected_chunks = sorted_results[:5]
+                
             # 4. Re-rank the chunks selected by our tiered logic
-            reranked_chunks = await self._rerank_chunks(selected_chunks, query)
-            top_results = reranked_chunks[:5] # Ensure we don't exceed 5 final results
+            # reranked_chunks = await self._rerank_chunks(selected_chunks, query)
 
             # 5. Format the final context for the LLM
             final_context = []
-            for result in top_results:
+            for result in selected_chunks:
                 if result.get("potential_response"):
                     result['content'] = (
                         f"A relevant Q&A pair was found in the knowledge base.\n"

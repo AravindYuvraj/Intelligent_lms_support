@@ -33,6 +33,7 @@ class GraphState(TypedDict):
     ticket_id: str
     user_id: str
     original_query: str
+    title: str
     category: str
     
     # User course information
@@ -216,11 +217,13 @@ class EnhancedLangGraphWorkflow:
                 else:
                     # Assuming 'agent' or 'support' roles are the AI
                     messages.append(AIMessage(content=message_content))
-            print("Updating state category", ticket["category"])
+            print("Updating state category", ticket["category"], ticket['title'])
+            print("Original Query: ", conversations[-1]['message'] if conversations and conversations[-1] and 'message' in conversations[-1] else "No original query available")
             print(f"User course info: {user_course_category} - {user_course_name}")
             state.update({
                 "user_id": str(ticket["user_id"]),
                 "original_query": conversations[-1]['message'] if conversations and conversations[-1] and 'message' in conversations[-1] else "No original query available", # The latest message is the current query
+                "title": ticket["title"],
                 "category": ticket["category"],
                 "user_course_category": user_course_category,
                 "user_course_name": user_course_name,
@@ -367,7 +370,7 @@ class EnhancedLangGraphWorkflow:
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a support expert for Masai School.
-Your task is to analyze the student's query and available context to make a single, definitive decision.
+Your task is to analyze the student's query along witht title and available context to make a single, definitive decision.
 
 IMPORTANT:
 - The KB context contains fragments from past cases.  
@@ -380,17 +383,17 @@ IMPORTANT:
 
 **Decision Logic:**
 1. **Classify Team:** First, determine if the query is for **EC (Experience Champion)** or **IA (Instructor Associate)**.
-   * EC: Logistics, attendance, leave, evaluations, placements, finances (ISA/NBFC), non-technical queries.
-   * IA: Technical issues, coding, DSA, code reviews, academic doubts.
+   * EC: Logistics, lecures, submissions, approvals, platform related, attendance, leave, evaluations, placements, finances (ISA/NBFC), non-technical queries.
+   * IA: Academic doubts, coding, DSA, code reviews.
 
 2. **Choose One Action:**
    a. **request_info:** If the query lacks specific details needed for a full answer (e.g., missing dates, specifics of a bug), choose this. You MUST list the needed info in `missing_info`.
    b. **escalate:** If the query is too complex, sensitive, or requires a manual action you can't perform, choose this. You MUST provide a clear `escalation_reason`.
-   c. **respond:** If you have enough context to fully and accurately answer, choose this. You MUST generate a helpful and complete `response` in your own words.
+   c. **respond:** If you have enough context to fully and accurately answer, choose this. You MUST generate a helpful and complete `response` in your own words Do not claim things you are not completely sure about.
 
 **Note:**
-1. Note that for students you are the EC or IA. They do not know you are an agent so form your response statement accordingly.
-2. In case student is required to submit or share any documents or information, consider choosing request_info if it appropriate for the situation.
+1. Note that for students you are the EC or IA. They do not know you are an agent so form your response statement accordingly. While escalating either say we'll get back shortly or sent to relevant authority for resolving.
+2. In case student is required to submit or share any documents or information, consider choosing request_info if it is appropriate for the situation.
 3. If student has given any supporting documents or information which needs to be checked and confirmed by admin, consider choosing escalate.
 
 **Output Format:**
@@ -401,12 +404,12 @@ Do not output multiple decision objects.
 If you output anything else, it will cause a system error.
 {{
   "decision": "respond" | "request_info" | "escalate",
-  "response": "Your generated response here. Null if not applicable.", // Must be rewritten in your own words, no direct copy from KB, Start the response with a sweet message like "Dear student, 
+  "response": "Your generated response here.", // Must be rewritten in your own words, no direct copy from KB, Start the response with a sweet message like "Dear student, 
 Thank you for reaching out to us. Supporting our students is our highest priority. 😊" and end it with "Thanks and Regards.". DO NOT INCLUDE personal details of any person like name, contact, etc. 
   "missing_info": ["List of questions or items needed. Null if not applicable."],
   "escalation_reason": "Reason for escalation. Null if not applicable.",
   "admin_type": "EC" | "IA",
-  "confidence": "Your confidence score in the range [0.0, 1.0]. Must be a float."
+  "confidence": "Your confidence score with respect to the decision and response in the range [0.0, 1.0]. Must be a float."
 }}
 """),
             MessagesPlaceholder(variable_name="messages"),
@@ -419,10 +422,13 @@ Thank you for reaching out to us. Supporting our students is our highest priorit
 **Available Knowledge Base Context :**
 {context}
 
+**Query Title:**
+{title}
+
 **Current User Query:**
 {query}
 
-Also go through message history, if any
+Also go through message history, if any, to understand the complete situation.
 
 Make your decision.
 """)
@@ -433,6 +439,7 @@ Make your decision.
             result = await chain.ainvoke({
                 "messages": state["messages"],
                 "context": state["context"],
+                "title": state["title"],
                 "query": state["original_query"]
             })
             
@@ -491,7 +498,7 @@ Make your decision.
             # Outcome 1: Request more information from the student
             if action == 'request_info' and decision.get('missing_info'):
                 print("Action: Requesting info from student.", decision.get("admin_type", "EC"), {state['agent_decision']['admin_type']})
-                message = decision.get('response', "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision['missing_info']))
+                message = ( decision.get("response") or "Thank you for contacting us. To better assist you, could you please provide the following information?\n\n" + "\n".join(f"• {info}" for info in decision.get("missing_info", [])))                
                 print("msg adding to conversaion:", message, decision.get('response'))
                 conversation_service.create_conversation(ticket_id, "agent", message, confidence_score=confidence)
                 
