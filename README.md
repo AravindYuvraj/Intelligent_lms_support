@@ -25,6 +25,9 @@ https://intelligent-lms-support-ppfz.vercel.app/
 ### Backend: 
 https://masaischool.duckdns.org/
 
+### Demo Video:
+https://drive.google.com/file/d/1RFn-I9orw1RU48T0IxHp9oxT1Bc5xLUZ/view?usp=sharing
+
 ## 📚 Table of Contents
 1. [Introduction](#-introduction)  
 2. [Features](#-features)  
